@@ -1,0 +1,3048 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Greyroom Reservations</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+<style>
+  :root{
+    --ink:#1B1F23;
+    --ink-soft:#2A2F35;
+    --ink-softer:#333941;
+    --parchment:#EDE7DD;
+    --brass:#B08D57;
+    --brass-bright:#C9A46E;
+    --green:#4F7942;
+    --red:#B5533C;
+    --line: rgba(237,231,221,0.14);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;background:var(--ink);color:var(--parchment);
+    font-family:'Outfit',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    min-height:100vh;
+  }
+  .wrap{max-width:1100px;margin:0 auto;padding:28px 20px 60px;}
+
+  /* ---- gate screens ---- */
+  .gate{
+    min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;
+  }
+  .gate-card{
+    width:100%;max-width:380px;background:var(--ink-soft);border:1px solid var(--line);
+    border-radius:12px;padding:32px 28px;text-align:center;
+  }
+  .gate-brand{font-family:'Outfit',sans-serif;font-weight:600;font-size:24px;margin-bottom:4px;}
+  .gate-brand span{color:var(--brass-bright);}
+  .gate-sub{font-size:12.5px;color:#9a958a;margin-bottom:24px;}
+  .gate-card label{display:block;text-align:left;font-size:12px;color:#a8a297;margin:14px 0 5px;}
+  .gate-card input{
+    width:100%;background:var(--ink);border:1px solid var(--line);color:var(--parchment);
+    padding:10px 11px;border-radius:6px;font-size:14px;letter-spacing:0.4px;
+  }
+  .gate-card input:focus{outline:none;border-color:var(--brass);}
+  .gate-btn{
+    margin-top:20px;width:100%;padding:11px;border:none;border-radius:6px;
+    background:var(--brass);color:var(--ink);font-weight:600;font-size:13.5px;cursor:pointer;
+  }
+  .gate-btn:hover{background:var(--brass-bright);}
+  .gate-error{color:var(--red);font-size:12.5px;margin-top:12px;min-height:16px;}
+  .gate-note{font-size:11px;color:#7a756a;margin-top:18px;line-height:1.5;}
+
+  /* ---- app chrome ---- */
+  header{
+    display:flex;justify-content:space-between;align-items:flex-end;
+    border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:26px;flex-wrap:wrap;gap:12px;
+  }
+  .brand{font-family:'Outfit',sans-serif;font-weight:600;font-size:26px;letter-spacing:0.5px;}
+  .brand span{color:var(--brass-bright);}
+  .subtitle{font-size:12.5px;color:#9a958a;margin-top:4px;letter-spacing:0.3px;}
+  .who{font-size:12.5px;color:#c9c3b5;display:flex;align-items:center;gap:12px;}
+  .who b{color:var(--brass-bright);}
+  .role-pill{font-size:10px;padding:2px 8px;border-radius:20px;border:1px solid var(--line);text-transform:uppercase;letter-spacing:0.4px;}
+  .logout-btn{
+    background:transparent;border:1px solid var(--line);color:#c9c3b5;padding:6px 12px;
+    border-radius:6px;font-size:12px;cursor:pointer;
+  }
+  .logout-btn:hover{border-color:var(--red);color:var(--red);}
+  .stats{display:flex;gap:22px;font-size:12.5px;color:#c9c3b5;}
+  .stats b{display:block;font-size:20px;color:var(--brass-bright);font-family:'Outfit',sans-serif;font-weight:600;}
+
+  .grid{display:grid;grid-template-columns:1fr;gap:24px;}
+  @media(min-width:920px){ .grid{grid-template-columns: 380px 1fr;} }
+
+  .panel{background:var(--ink-soft);border:1px solid var(--line);border-radius:10px;padding:20px;}
+  .panel h2{font-size:13px;text-transform:uppercase;letter-spacing:1.4px;color:var(--brass-bright);margin:0 0 16px;font-weight:600;}
+  label{display:block;font-size:12px;color:#a8a297;margin:12px 0 5px;letter-spacing:0.2px;}
+  label:first-of-type{margin-top:0;}
+  input,select,textarea{
+    width:100%;background:var(--ink);border:1px solid var(--line);color:var(--parchment);
+    padding:9px 10px;border-radius:6px;font-size:14px;font-family:inherit;
+  }
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brass);}
+  textarea{resize:vertical;min-height:50px;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+  .btn{
+    margin-top:18px;width:100%;padding:11px;border:none;border-radius:6px;background:var(--brass);
+    color:var(--ink);font-weight:600;font-size:13.5px;letter-spacing:0.3px;cursor:pointer;transition:background .15s;
+  }
+  .btn:hover{background:var(--brass-bright);}
+  .btn-ghost{background:transparent;border:1px solid var(--line);color:#c9c3b5;margin-top:8px;}
+  .btn-ghost:hover{border-color:var(--brass);color:var(--brass-bright);}
+
+  .manage-props{margin-top:16px;border-top:1px solid var(--line);padding-top:14px;}
+  .manage-props summary{cursor:pointer;font-size:12px;color:#9a958a;letter-spacing:0.3px;}
+  .prop-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+  .prop-tag{background:var(--ink);border:1px solid var(--line);border-radius:20px;padding:4px 10px;font-size:11.5px;color:#c9c3b5;display:flex;align-items:center;gap:6px;}
+  .prop-tag button{background:none;border:none;color:#8a5a4a;cursor:pointer;font-size:13px;padding:0;line-height:1;}
+  .add-prop-row{display:flex;gap:6px;margin-top:8px;}
+  .add-prop-row input{flex:1;}
+  .add-prop-row button{padding:0 12px;background:var(--brass);border:none;border-radius:6px;color:var(--ink);cursor:pointer;font-weight:600;}
+
+  .cards{display:flex;flex-direction:column;gap:12px;}
+  .card{background:var(--ink-soft);border:1px solid var(--line);border-radius:10px;padding:16px 18px;position:relative;}
+  .card.pending{border-left:3px solid var(--brass);}
+  .card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;}
+  .card-title{font-weight:600;font-size:15px;}
+  .card-plat{font-size:10.5px;text-transform:uppercase;letter-spacing:0.6px;padding:2px 8px;border-radius:20px;border:1px solid var(--line);color:#c9c3b5;}
+  .card-meta{font-size:12.5px;color:#9a958a;margin-top:6px;line-height:1.6;}
+  .card-meta b{color:#c9c3b5;font-weight:500;}
+  .card-notes{font-size:12.5px;color:#8f897d;margin-top:8px;font-style:italic;}
+  .card-by{font-size:11px;color:#7a756a;margin-top:8px;}
+  .card-actions{display:flex;gap:8px;margin-top:14px;}
+  .card-actions button{flex:1;padding:8px;border-radius:6px;border:none;cursor:pointer;font-size:12.5px;font-weight:600;letter-spacing:0.3px;}
+  .accept-btn{background:var(--green);color:#eef4ea;}
+  .reject-btn{background:transparent;border:1px solid var(--red)!important;color:var(--red);}
+  .accept-btn:hover{opacity:0.88;}
+
+  .db-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .db-table th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:0.6px;color:#8f897d;padding:8px 10px;border-bottom:1px solid var(--line);font-weight:600;}
+  .db-table td{padding:9px 10px;border-bottom:1px solid var(--line);color:#d8d2c5;}
+  .db-table tr:hover td{background:rgba(176,141,87,0.05);}
+  .plat-pill{font-size:10px;padding:2px 7px;border-radius:20px;border:1px solid var(--line);white-space:nowrap;}
+  .empty{color:#7a756a;font-size:13px;text-align:center;padding:30px 10px;}
+  .table-wrap{overflow-x:auto;}
+  .search-bar{margin-bottom:14px;}
+
+  .toast{
+    position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--brass);color:var(--ink);
+    padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;
+    transition:opacity .25s, transform .25s;box-shadow:0 8px 24px rgba(0,0,0,0.35);z-index:50;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px);}
+  .loading-line{font-size:12px;color:#7a756a;padding:8px 0;text-align:center;}
+
+  /* people admin */
+  .people-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);font-size:12.5px;gap:8px;flex-wrap:wrap;}
+  .people-row:last-child{border-bottom:none;}
+  .people-name{font-weight:600;}
+  .people-code{font-family:monospace;color:var(--brass-bright);font-size:12px;background:var(--ink);padding:2px 7px;border-radius:5px;}
+  .people-remove{background:none;border:none;color:#8a5a4a;cursor:pointer;font-size:12px;}
+  .people-remove:hover{color:var(--red);}
+  .month-bar{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;align-items:center;padding-bottom:14px;border-bottom:1px solid var(--line);}
+  .month-pill{
+    background:var(--ink-soft);border:1px solid var(--line);color:#c9c3b5;padding:6px 14px;border-radius:16px;
+    font-size:12.5px;cursor:pointer;font-weight:500;
+  }
+  .month-pill.active{background:var(--brass-bright);border-color:var(--brass-bright);color:var(--ink);font-weight:700;}
+  .month-pill.add{background:transparent;border-style:dashed;color:#8f897d;}
+  .month-bar input{padding:6px 10px;font-size:12px;width:130px;}
+
+  .tabs{display:flex;gap:6px;margin-bottom:18px;}
+  .tab-btn{
+    background:transparent;border:1px solid var(--line);color:#9a958a;padding:7px 14px;border-radius:20px;
+    font-size:12.5px;cursor:pointer;
+  }
+  .tab-btn.active{background:var(--brass);border-color:var(--brass);color:var(--ink);font-weight:600;}
+  .log-line{font-size:12px;color:#9a958a;padding:6px 0;border-bottom:1px solid var(--line);}
+  .log-line b{color:#c9c3b5;}
+  .log-time{color:#6b665c;font-size:10.5px;}
+
+  /* Statistics tab */
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:6px;}
+  .kpi-card{background:var(--ink);border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
+  .kpi-label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.6px;color:#8f897d;}
+  .kpi-value{font-family:'Outfit',sans-serif;font-weight:600;font-size:22px;color:var(--parchment);margin-top:4px;}
+  .kpi-sub{font-size:11px;color:#7a756a;margin-top:3px;}
+  .kpi-value.good{color:var(--green);}
+  .kpi-value.bad{color:var(--red);}
+
+  .bar-row{margin-bottom:14px;}
+  .bar-row-top{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:5px;}
+  .bar-row-top b{color:var(--parchment);}
+  .bar-track{background:var(--ink);border-radius:6px;height:10px;overflow:hidden;display:flex;}
+  .bar-fill-sales{background:var(--brass);height:100%;}
+  .bar-fill-expense{background:var(--red);height:100%;opacity:0.75;}
+  .bar-legend{display:flex;gap:16px;font-size:11px;color:#9a958a;margin-bottom:16px;}
+  .bar-legend span{display:inline-flex;align-items:center;gap:5px;}
+  .legend-dot{width:8px;height:8px;border-radius:2px;display:inline-block;}
+
+  .ratio-badge{font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600;}
+  .ratio-good{background:rgba(79,121,66,0.18);color:var(--green);}
+  .ratio-bad{background:rgba(181,83,60,0.18);color:var(--red);}
+
+  .mix-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:12.5px;}
+  .mix-label{width:120px;flex-shrink:0;color:#c9c3b5;}
+  .mix-track{flex:1;background:var(--ink);border-radius:6px;height:14px;overflow:hidden;}
+  .mix-fill{background:var(--brass-bright);height:100%;}
+  .mix-pct{width:52px;text-align:right;flex-shrink:0;color:#9a958a;font-size:11.5px;}
+
+  .threshold-note{font-size:11px;color:#7a756a;margin:8px 0 16px;}
+
+  .insight-card{background:var(--ink);border-left:3px solid var(--brass);border-radius:6px;padding:12px 14px;margin-bottom:10px;font-size:12.5px;line-height:1.5;color:#d8d2c5;}
+  .insight-card.warn{border-left-color:var(--red);}
+  .insight-card.good{border-left-color:var(--green);}
+  .insight-tag{display:inline-block;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;padding:1px 7px;border-radius:10px;margin-right:8px;font-weight:600;}
+  .insight-tag.warn{background:rgba(181,83,60,0.18);color:var(--red);}
+  .insight-tag.good{background:rgba(79,121,66,0.18);color:var(--green);}
+  .insight-tag.info{background:rgba(176,141,87,0.18);color:var(--brass-bright);}
+  .rank-num{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--ink);border:1px solid var(--line);font-size:11px;color:#9a958a;margin-right:8px;flex-shrink:0;}
+</style>
+</head>
+<body>
+
+<!-- ============ GATE: bootstrap / login ============ -->
+<div class="gate" id="gateScreen">
+  <div class="gate-card">
+    <div class="gate-brand">Grey<span>room</span> Reservations</div>
+    <div class="gate-sub" id="gateSub">Loading…</div>
+
+    <div id="bootstrapForm" style="display:none;">
+      <label>Your name</label>
+      <input id="boot-name" placeholder="e.g. Saif Kazi">
+      <label>Create your access code</label>
+      <input id="boot-code" placeholder="e.g. SAIF-2026" style="text-transform:uppercase;">
+      <button class="gate-btn" onclick="doBootstrap()">Create owner access</button>
+      <div class="gate-note">You're the first person opening this site, so you'll be set up as the owner. From there you can create access codes for anyone else who should get in.</div>
+    </div>
+
+    <div id="loginForm" style="display:none;">
+      <label>Access code</label>
+      <input id="login-code" placeholder="Enter your access code" style="text-transform:uppercase;" onkeydown="if(event.key==='Enter') doLogin()">
+      <button class="gate-btn" onclick="doLogin()">Enter</button>
+    </div>
+
+    <div class="gate-error" id="gateError"></div>
+  </div>
+</div>
+
+<!-- ============ MAIN APP ============ -->
+<div class="wrap" id="appScreen" style="display:none;">
+
+  <header>
+    <div>
+      <div class="brand">Grey<span>room</span> Reservations</div>
+      <div class="subtitle">Airbnb + Booking.com → review → confirmed database</div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+      <div class="who">
+        Signed in as <b id="whoName"></b>
+        <span class="role-pill" id="whoRole"></span>
+        <span id="syncStatus" style="font-size:11px;color:#7a756a;">✓ Saved</span>
+        <button class="logout-btn" onclick="doLogout()">Log out</button>
+      </div>
+      <div class="stats">
+        <div><b id="statPending">0</b>pending</div>
+        <div><b id="statConfirmed">0</b>confirmed</div>
+      </div>
+    </div>
+  </header>
+
+  <div class="month-bar" id="monthBar"></div>
+
+  <div class="tabs" id="tabBar">
+    <button class="tab-btn active" data-tab="reservations" onclick="switchTab('reservations')">Reservations</button>
+    <button class="tab-btn" data-tab="financials" onclick="switchTab('financials')">Financials</button>
+    <button class="tab-btn" data-tab="statistics" onclick="switchTab('statistics')">Statistics</button>
+    <button class="tab-btn" data-tab="analysis" onclick="switchTab('analysis')">Expense &amp; Revenue Analysis</button>
+    <button class="tab-btn" data-tab="admin" onclick="switchTab('admin')" id="adminTabBtn" style="display:none;">Manage access</button>
+  </div>
+
+  <div id="tab-reservations">
+    <div class="grid">
+      <div class="panel" id="intakePanel">
+        <h2>New booking notification</h2>
+        <div id="intakeViewOnlyMsg" style="display:none;font-size:13px;color:#9a958a;padding:20px 0;">
+          You have view-only access. An admin or member can add new bookings.
+        </div>
+        <div id="intakeFormContent">
+        <label>Property</label>
+        <select id="f-property"></select>
+        <div class="row2">
+          <div><label>Platform</label>
+            <select id="f-platform">
+              <option>Airbnb</option>
+              <option>Booking.com</option>
+              <option>Travela</option>
+              <option>Referred</option>
+              <option>Stayed Before</option>
+            </select>
+          </div>
+          <div><label>Booking ref / ID</label><input id="f-ref" placeholder="optional"></div>
+        </div>
+        <label>Guest name</label>
+        <input id="f-guest" placeholder="Guest full name">
+        <div class="row2">
+          <div><label>Check-in *</label><input id="f-checkin" type="date"></div>
+          <div><label>Check-out *</label><input id="f-checkout" type="date"></div>
+        </div>
+        <label>Guest phone number *</label>
+        <input id="f-contact" placeholder="e.g. 01xxxxxxxxx">
+
+        <div class="row2">
+          <div>
+            <label>Payout currency</label>
+            <select id="f-currency" onchange="onCurrencyChange()">
+              <option value="BDT">BDT</option>
+              <option value="USD">USD ($)</option>
+            </select>
+          </div>
+          <div>
+            <label id="f-amount-label">Amount (BDT)</label>
+            <input id="f-amount" type="number" min="0" step="0.01" placeholder="e.g. 8500" oninput="updateConvertedPreview()">
+          </div>
+        </div>
+        <div id="convertedPreview" style="font-size:11.5px;color:#8f897d;margin-top:-6px;"></div>
+
+        <label>Payment gateway</label>
+        <select id="f-gateway">
+          <option>Cash</option>
+          <option>Saif Bkash</option>
+          <option>Bkash Merchant</option>
+          <option>Brac Bank</option>
+          <option>Payoneer</option>
+        </select>
+
+        <label>Notes</label>
+        <textarea id="f-notes" placeholder="Any special request, ID verification pending, etc."></textarea>
+        <button class="btn" onclick="addPending()">Add to pending queue</button>
+
+        <details class="manage-props">
+          <summary>Manage properties</summary>
+          <div class="prop-tags" id="propTags"></div>
+          <div class="add-prop-row">
+            <input id="newPropInput" placeholder="Add property name">
+            <button onclick="addProperty()">Add</button>
+          </div>
+        </details>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:24px;">
+        <div class="panel">
+          <h2>Pending review</h2>
+          <div class="cards" id="pendingList"><div class="loading-line">Loading…</div></div>
+        </div>
+
+        <div class="panel">
+          <h2>Confirmed database</h2>
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap;">
+            <label for="excelImportInput" class="btn-ghost" style="margin:0;padding:9px 14px;cursor:pointer;display:inline-block;">Import from Excel (.xlsx)</label>
+            <input type="file" id="excelImportInput" accept=".xlsx,.xls" style="display:none;" onchange="handleExcelImport(event)">
+            <span id="importStatus" style="font-size:11.5px;color:#8f897d;"></span>
+          </div>
+          <input class="search-bar" id="dbSearch" placeholder="Search guest, property, phone, ref…" oninput="renderConfirmed()">
+          <div class="table-wrap">
+            <table class="db-table">
+              <thead><tr>
+                <th>S/L</th><th>Property</th><th>Platform</th><th>Guest</th><th>Phone</th><th>Check-in</th><th>Check-out</th>
+                <th>Amount received</th><th>BDT equivalent</th><th>Gateway</th><th></th>
+              </tr></thead>
+              <tbody id="confirmedBody"></tbody>
+            </table>
+          </div>
+          <div id="confirmedEmpty" class="empty" style="display:none;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-financials" style="display:none;">
+    <div class="grid">
+      <div class="panel" id="expensePanel">
+        <h2>Add expense</h2>
+        <div id="expenseViewOnlyMsg" style="display:none;font-size:13px;color:#9a958a;padding:20px 0;">
+          You have view-only access. An admin or member can add expenses.
+        </div>
+        <div id="expenseFormContent">
+        <label>Property</label>
+        <select id="ex-property"></select>
+        <div class="row2">
+          <div><label>Category</label>
+            <select id="ex-category">
+              <option>Maintenance</option>
+              <option>Utilities</option>
+              <option>Staff / Labor</option>
+              <option>Guest Amenities</option>
+              <option>Cleaning</option>
+              <option>Supplies</option>
+              <option>Commission</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div><label>Date</label><input id="ex-date" type="date"></div>
+        </div>
+        <div class="row2">
+          <div><label>Currency</label>
+            <select id="ex-currency" onchange="updateExpensePreview()">
+              <option value="BDT">BDT</option>
+              <option value="USD">USD ($)</option>
+            </select>
+          </div>
+          <div><label id="ex-amount-label">Amount (BDT)</label><input id="ex-amount" type="number" min="0" step="0.01" placeholder="e.g. 3500" oninput="updateExpensePreview()"></div>
+        </div>
+        <div id="expenseConvertedPreview" style="font-size:11.5px;color:#8f897d;margin-top:-6px;"></div>
+        <label>Item / Description</label>
+        <input id="ex-item" placeholder="e.g. Electric Bill, Airfreshener, Service Charge">
+        <label>Notes</label>
+        <textarea id="ex-notes" placeholder="Any extra detail (optional)"></textarea>
+        <button class="btn" onclick="addExpense()">Add expense</button>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:24px;">
+        <div class="panel">
+          <h2>Received by gateway</h2>
+          <div class="table-wrap">
+            <table class="db-table">
+              <thead><tr><th>Gateway</th><th>Total received (BDT)</th></tr></thead>
+              <tbody id="gatewayReportBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Cash handover (not sales)</h2>
+          <div style="font-size:12.5px;color:#9a958a;margin-bottom:14px;">
+            Internal tracking only — how much cash has been handed over. This is separate from sales and is never counted in gateway or revenue totals.
+          </div>
+          <div class="table-wrap">
+            <table class="db-table">
+              <thead><tr><th>Property</th><th>Total Handover (BDT)</th></tr></thead>
+              <tbody id="handoverReportBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Property-wise sales, expense &amp; revenue</h2>
+          <div class="table-wrap">
+            <table class="db-table">
+              <thead><tr><th>Property</th><th>Sales (BDT)</th><th>Expense (BDT)</th><th>Revenue (BDT)</th></tr></thead>
+              <tbody id="propertyReportBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Property-wise expense breakdown</h2>
+          <div class="table-wrap">
+            <table class="db-table">
+              <thead><tr><th>Property</th><th>Item</th><th>Category</th><th>Amount (BDT)</th></tr></thead>
+              <tbody id="expenseBreakdownBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Expense log</h2>
+          <label>Filter by property</label>
+          <select id="expenseLogFilter" onchange="renderExpenseLog()">
+            <option value="__all__">All properties</option>
+          </select>
+          <div class="table-wrap" style="margin-top:12px;">
+            <table class="db-table">
+              <thead><tr><th>Item</th><th>Qty (pcs)</th><th>Total Amount (BDT)</th><th>Property</th><th></th></tr></thead>
+              <tbody id="expenseBody"></tbody>
+            </table>
+          </div>
+          <div id="expenseEmpty" class="empty" style="display:none;">No expenses logged yet.</div>
+        </div>
+
+        <div class="panel">
+          <h2>Monthly requisition list</h2>
+          <div style="font-size:12.5px;color:#9a958a;margin-bottom:14px;">
+            Every item bought across <b style="color:var(--brass-bright);">all properties</b> this month, combined into one list — sorted by category, so you can buy in bulk for one requisition run instead of property by property.
+          </div>
+          <div class="table-wrap">
+            <table class="db-table">
+              <thead><tr><th>Category</th><th>Item</th><th>Total Qty (pcs)</th><th>Needed by</th><th>Total Spent (BDT)</th></tr></thead>
+              <tbody id="requisitionBody"></tbody>
+            </table>
+          </div>
+          <div id="requisitionEmpty" class="empty" style="display:none;">No expenses logged yet this month.</div>
+        </div>
+
+        <div class="panel" id="recalcPanel" style="display:none;">
+          <h2>Recalculate</h2>
+          <div style="font-size:12.5px;color:#9a958a;margin-bottom:14px;">
+            Owner-only. Re-checks every booking and expense: removes exact duplicates (e.g. from importing the same Excel file more than once), fixes any amount that isn't a valid number, and refreshes all totals from scratch.
+          </div>
+          <button class="btn-ghost" style="margin:0;" onclick="recalculateData()">Recalculate now</button>
+          <div id="recalcStatus" style="font-size:11.5px;color:#8f897d;margin-top:10px;"></div>
+        </div>
+
+        <div class="panel" id="exportPanel" style="display:none;">
+          <h2>Export full report</h2>
+          <div style="font-size:12.5px;color:#9a958a;margin-bottom:14px;">Owner-only. Exports Reservations and Financials together.</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn-ghost" style="margin:0;" onclick="exportExcelReport()">Export Excel (.xlsx)</button>
+            <button class="btn-ghost" style="margin:0;" onclick="exportWordReport()">Export Word (.doc)</button>
+            <button class="btn-ghost" style="margin:0;" onclick="exportPdfReport()">Export PDF (.pdf)</button>
+          </div>
+          <div id="exportStatus" style="font-size:11.5px;color:#8f897d;margin-top:10px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-statistics" style="display:none;">
+
+    <div class="panel" style="margin-bottom:24px;">
+      <h2>Executive overview</h2>
+      <div class="kpi-grid" id="statKpiGrid"></div>
+    </div>
+
+    <div class="grid">
+      <div class="panel">
+        <h2>Property performance</h2>
+        <div class="bar-legend">
+          <span><span class="legend-dot" style="background:var(--brass);"></span>Sales</span>
+          <span><span class="legend-dot" style="background:var(--red);opacity:0.75;"></span>Expense</span>
+        </div>
+        <div id="statPropertyBars"></div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:24px;">
+        <div class="panel">
+          <h2>Cost-control priorities</h2>
+          <div class="threshold-note">
+            Expense ratio target: keep expenses below
+            <input id="expenseRatioTarget" type="number" min="1" max="100" value="45" style="width:52px;display:inline-block;padding:3px 6px;font-size:12px;" onchange="renderStatistics()">% of sales.
+          </div>
+          <div class="table-wrap">
+            <table class="db-table">
+              <thead><tr><th>Property</th><th>Sales</th><th>Expense</th><th>Ratio</th></tr></thead>
+              <tbody id="statRatioBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Collection mix</h2>
+          <div id="statCollectionMix"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:24px;" id="historicalPanel">
+      <h2>Historical analysis</h2>
+      <div id="historicalEmpty" class="empty" style="display:none;">
+        No historical data yet — import an Excel sheet with a "Property Name" table (Sales/Expense/Revenue by month) to see trends here.
+      </div>
+      <div id="historicalContent" style="display:none;">
+        <div style="font-size:12.5px;color:#9a958a;margin-bottom:16px;">
+          Imported months (e.g. April'26–June'26) are static totals from your sheet. Every month you track live in this app (July'26, August'26, ...) is calculated automatically from that month's Reservations and Financials — not from any sheet.
+        </div>
+        <div id="historicalChartWrap" style="margin-bottom:24px;"></div>
+        <div class="table-wrap">
+          <table class="db-table" id="historicalTable">
+            <thead id="historicalTableHead"></thead>
+            <tbody id="historicalTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="tab-analysis" style="display:none;">
+
+    <div class="panel" style="margin-bottom:24px;">
+      <h2>Suggestions &amp; action points</h2>
+      <div style="font-size:12.5px;color:#9a958a;margin-bottom:14px;">Generated from current numbers using simple rules (highest cost, biggest expense ratio, negative revenue) — not AI-written commentary.</div>
+      <div id="analysisSuggestions"></div>
+    </div>
+
+    <div class="grid">
+      <div class="panel">
+        <h2>Top expense items</h2>
+        <div style="font-size:12.5px;color:#9a958a;margin-bottom:14px;">Which specific costs are eating the most, across all properties.</div>
+        <div class="table-wrap">
+          <table class="db-table">
+            <thead><tr><th></th><th>Item</th><th>Category</th><th>Property</th><th>Amount (BDT)</th></tr></thead>
+            <tbody id="topExpenseItemsBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:24px;">
+        <div class="panel">
+          <h2>Highest-expense properties</h2>
+          <div id="expenseRankBars"></div>
+        </div>
+
+        <div class="panel">
+          <h2>Revenue ranking</h2>
+          <div style="font-size:12.5px;color:#9a958a;margin-bottom:14px;">Best to worst, by net revenue and margin.</div>
+          <div class="table-wrap">
+            <table class="db-table">
+              <thead><tr><th></th><th>Property</th><th>Sales</th><th>Revenue</th><th>Margin</th></tr></thead>
+              <tbody id="revenueRankBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="tab-admin" style="display:none;">
+    <div class="grid">
+      <div class="panel">
+        <h2>Grant access</h2>
+        <label>Name</label>
+        <input id="np-name" placeholder="Full name">
+        <label>Access code</label>
+        <input id="np-code" placeholder="e.g. RIMA-01" style="text-transform:uppercase;">
+        <label>Role</label>
+        <select id="np-role">
+          <option value="member">Member — can add/accept/reject bookings</option>
+          <option value="viewer">Viewer — can only view, no changes</option>
+          <option value="admin">Admin — can also manage access</option>
+        </select>
+        <button class="btn" onclick="addPerson()">Create access code</button>
+      </div>
+      <div class="panel">
+        <h2>People with access</h2>
+        <div id="peopleList"></div>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:24px;">
+      <h2>Activity log</h2>
+      <div id="activityLog"></div>
+    </div>
+
+    <div class="panel" style="margin-top:24px;">
+      <h2>Backup &amp; restore (most reliable safety net)</h2>
+      <div style="font-size:12.5px;color:#9a958a;margin-bottom:14px;">
+        Downloads every month, booking, expense, handover, property and access code into one file on your device.
+        This file does not depend on browser storage at all, so it survives anything. Do this at the end of each working day.
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <button class="btn-ghost" style="margin:0;" onclick="downloadBackup()">Download backup file</button>
+        <label for="restoreInput" class="btn-ghost" style="margin:0;padding:9px 14px;cursor:pointer;display:inline-block;">Restore from backup file</label>
+        <input type="file" id="restoreInput" accept=".json" style="display:none;" onchange="handleRestore(event)">
+      </div>
+      <div id="backupStatus" style="font-size:11.5px;color:#8f897d;margin-top:10px;"></div>
+    </div>
+
+    <div class="panel" style="margin-top:24px;">
+      <h2>Migrate old data</h2>
+      <div style="font-size:12.5px;color:#9a958a;margin-bottom:14px;">
+        This app now saves to Google Sheets instead of Claude's old storage. If any bookings, expenses, handovers, or months are still sitting in that old storage from before the switch, this pulls them in and merges them into Google Sheets. Safe to run any time — it never deletes anything.
+      </div>
+      <button class="btn-ghost" style="margin:0;" onclick="recoverLocalData()">Check for old data to migrate</button>
+      <div id="recoverStatus" style="font-size:11.5px;color:#8f897d;margin-top:10px;"></div>
+    </div>
+
+    <div class="panel" style="margin-top:24px;border:1px solid var(--red);">
+      <h2 style="color:var(--red);">Danger zone</h2>
+      <div style="font-size:12.5px;color:#9a958a;margin-bottom:14px;">
+        Clears all pending bookings, confirmed bookings, expenses and handovers <b style="color:var(--brass-bright);">for the currently selected month only</b> — useful if an Excel import went wrong. Other months, properties and team access are kept. This cannot be undone.
+      </div>
+      <button class="btn" id="clearDataBtn" style="background:var(--red);margin:0;" onclick="showClearConfirm()">Clear all data</button>
+      <div id="clearConfirmRow" style="display:none;margin-top:12px;padding:12px;background:rgba(181,83,60,0.1);border:1px solid var(--red);border-radius:8px;">
+        <div style="font-size:12.5px;color:var(--parchment);margin-bottom:10px;">Are you sure? This will permanently delete <b id="clearCounts"></b>. This cannot be undone.</div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn" style="background:var(--red);margin:0;flex:1;" onclick="clearAllData()">Yes, delete everything</button>
+          <button class="btn-ghost" style="margin:0;flex:1;" onclick="hideClearConfirm()">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const DEFAULT_PROPERTIES = ["Executive Lounge","Lofted Oasis","Urban Oasis","Cozy Executive","Juliyet Residence","Shanta Vantage","Aurora Residence"];
+
+let accessList = [];   // [{id,name,code,role,addedAt}]
+let activityLog = [];  // [{id,ts,who,action}]
+let properties = [...DEFAULT_PROPERTIES];
+let pending = [];
+let confirmed = [];
+let expenses = [];     // [{id,property,category,date,currency,amount,notes,addedBy,addedAt}]
+let handovers = [];    // [{id,property,guest,amount,date,addedBy,addedAt}] — internal cash handover tracking, NOT sales revenue
+let historicalAnalysis = { months: [], sales: {}, expense: {}, revenue: {} }; // imported month-by-month totals, current month is computed live and appended for display
+let months = [];         // e.g. ["July'26", "August'26"] — live tracked months, each entry tagged .month
+let currentMonth = null; // which month tab is active right now
+let session = null;    // {name, code, role}
+let isViewer = false;
+let bootstrapOverride = false; // set after one warned attempt when storage can't be verified
+
+function uid(){ return 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+function nights(inD, outD){
+  if(!inD || !outD) return '—';
+  const diff = Math.round((new Date(outD)-new Date(inD))/(1000*60*60*24));
+  return diff > 0 ? diff : '—';
+}
+function fmtDate(d){
+  if(!d) return '—';
+  const m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(!m) return '—';
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const mo = parseInt(m[2],10), da = parseInt(m[3],10);
+  if(mo < 1 || mo > 12) return '—';
+  return `${String(da).padStart(2,'0')} ${MONTHS[mo-1]} ${m[1]}`;
+}
+const USD_TO_BDT = 123;
+function fmtReceived(a, currency){
+  if(!a && a !== 0) return '—';
+  const num = Number(a);
+  return currency === 'USD' ? '$' + num.toLocaleString('en-US', {maximumFractionDigits:2}) : 'BDT ' + num.toLocaleString('en-IN');
+}
+function fmtBdtEquivalent(a, currency){
+  if(!a && a !== 0) return '—';
+  const num = Number(a);
+  const bdt = currency === 'USD' ? num * USD_TO_BDT : num;
+  return 'BDT ' + Math.round(bdt).toLocaleString('en-IN');
+}
+function toBdtNumber(a, currency){
+  if(a === null || a === undefined || a === '') return 0;
+  const num = Number(a);
+  if(isNaN(num)) return 0;
+  return currency === 'USD' ? num * USD_TO_BDT : num;
+}
+function onCurrencyChange(){
+  const currency = document.getElementById('f-currency').value;
+  document.getElementById('f-amount-label').textContent = currency === 'USD' ? 'Amount (USD $)' : 'Amount (BDT)';
+  updateConvertedPreview();
+}
+function updateConvertedPreview(){
+  const currency = document.getElementById('f-currency').value;
+  const amount = parseFloat(document.getElementById('f-amount').value);
+  const preview = document.getElementById('convertedPreview');
+  if(currency === 'USD' && !isNaN(amount)){
+    preview.textContent = '≈ BDT ' + Math.round(amount * USD_TO_BDT).toLocaleString('en-IN') + ' (at 123/USD)';
+  } else {
+    preview.textContent = '';
+  }
+}
+function updateExpensePreview(){
+  const currencyEl = document.getElementById('ex-currency');
+  const amountEl = document.getElementById('ex-amount');
+  if(!currencyEl || !amountEl) return;
+  const currency = currencyEl.value;
+  document.getElementById('ex-amount-label').textContent = currency === 'USD' ? 'Amount (USD $)' : 'Amount (BDT)';
+  const amount = parseFloat(amountEl.value);
+  const preview = document.getElementById('expenseConvertedPreview');
+  if(currency === 'USD' && !isNaN(amount)){
+    preview.textContent = '≈ BDT ' + Math.round(amount * USD_TO_BDT).toLocaleString('en-IN') + ' (at 123/USD)';
+  } else {
+    preview.textContent = '';
+  }
+}
+function escapeHtml(s){
+  if(s===undefined||s===null) return '';
+  return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+// For embedding a value inside onclick="fn('VALUE')": escaping the apostrophe as an HTML
+// entity is NOT enough — the browser decodes &#39; back to a literal ' before JS parses the
+// attribute, which breaks out of the single-quoted string. Escape it as a JS \' instead
+// (safe as literal HTML text), and HTML-entity-escape any double quote so it can't break out
+// of the outer double-quoted HTML attribute either.
+function jsAttrEscape(s){
+  if(s===undefined||s===null) return '';
+  return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+}
+async function logActivity(action){
+  activityLog.unshift({ id: uid(), ts: new Date().toISOString(), who: session ? session.name : 'system', action });
+  activityLog = activityLog.slice(0, 200);
+  await storageSet('greyroom:activity-log', JSON.stringify(activityLog));
+}
+
+// ---------------- Storage backend: Google Sheets via Apps Script Web App ----------------
+// This app is meant to be hosted outside Claude (e.g. Netlify), so the artifact CSP
+// sandbox that blocks third-party fetch() calls no longer applies. Same key/value
+// model as before (greyroom:pending, greyroom:confirmed, etc.), same storageGet/
+// storageSet interface, so nothing else in the app needed to change.
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbx08-ncLlcw9Fx1CELguXoDxiYo2coXsrVetygJ4letflHO80SmuSAWZ_JZk1nJ9Mgk8w/exec';
+
+function setSyncStatus(ok){
+  const el = document.getElementById('syncStatus');
+  if(!el) return;
+  if(ok){
+    el.textContent = '✓ Saved';
+    el.style.color = 'var(--green)';
+  } else {
+    el.textContent = '⚠ Save issue — retrying';
+    el.style.color = 'var(--red)';
+  }
+}
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+async function gasFetchWithRetry(url, options, attempts = 3){
+  let lastErr = null;
+  for(let i = 0; i < attempts; i++){
+    try{
+      const res = await fetch(url, options);
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      if(data && data.error) throw new Error(data.error);
+      return data;
+    }catch(e){
+      lastErr = e;
+      if(i < attempts - 1) await sleep(300 * Math.pow(2, i)); // 300ms, 600ms
+    }
+  }
+  throw lastErr;
+}
+
+async function storageGet(key){
+  // Prefer the bulk cache from the initial page load — avoids an extra round trip.
+  if(bulkCache && Object.prototype.hasOwnProperty.call(bulkCache, key)){
+    const v = bulkCache[key];
+    if(v === null || v === undefined || v === '') return null;
+    return { key, value: v };
+  }
+  try{
+    const data = await gasFetchWithRetry(`${GAS_URL}?key=${encodeURIComponent(key)}&t=${Date.now()}`, { method: 'GET' });
+    if(data.value === null || data.value === undefined || data.value === '') return null;
+    return { key: data.key, value: data.value };
+  }catch(e){
+    console.error('Sheet get failed for ' + key, e);
+    return null;
+  }
+}
+
+async function storageGetAll(){
+  try{
+    const data = await gasFetchWithRetry(`${GAS_URL}?t=${Date.now()}`, { method: 'GET' });
+    return data.all || {};
+  }catch(e){
+    console.error('Sheet bulk get failed', e);
+    return null;
+  }
+}
+
+async function storageSet(key, value){
+  if(bulkCache) bulkCache[key] = value; // keep the cache fresh so later reads this session stay instant
+  try{
+    const data = await gasFetchWithRetry(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ key, value }),
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' } // avoids a CORS preflight that Apps Script can't answer
+    });
+    setSyncStatus(true);
+    return { key: data.key, value: data.value };
+  }catch(e){
+    console.error('Sheet save failed for ' + key, e);
+    setSyncStatus(false);
+    showToast('Could not save — please try again');
+    return null;
+  }
+}
+
+// ---------------- Boot sequence ----------------
+let bulkCache = null; // populated once at boot via storageGetAll() — avoids ~9 sequential round trips
+async function init(){
+  bulkCache = await storageGetAll(); // one round trip fetches every key; null means the fetch genuinely failed
+  const fetchFailed = bulkCache === null;
+  if(bulkCache === null) bulkCache = {}; // treat as empty so storageGet() falls back to individual fetches
+
+  const res = await storageGet('greyroom:access-list');
+
+  accessList = res && res.value ? JSON.parse(res.value) : [];
+
+  if(accessList.length === 0){
+    document.getElementById('gateSub').textContent = 'Set up access for your team';
+    document.getElementById('bootstrapForm').style.display = 'block';
+    if(fetchFailed){
+      document.getElementById('gateError').innerHTML =
+        'Note: storage didn\'t respond just now. If your team already has access set up, this page may be showing "Set up access" incorrectly due to a temporary connection issue — try <a href="#" onclick="location.reload();return false;" style="color:var(--brass-bright);">reloading</a> before creating a new owner code.';
+    }
+  } else {
+    document.getElementById('gateSub').textContent = 'Enter your access code to continue';
+    document.getElementById('loginForm').style.display = 'block';
+  }
+}
+
+async function doBootstrap(){
+  const name = document.getElementById('boot-name').value.trim();
+  const code = document.getElementById('boot-code').value.trim().toUpperCase();
+  const errEl = document.getElementById('gateError');
+  errEl.textContent = '';
+  if(!name || !code){ errEl.textContent = 'Name and access code are both required.'; return; }
+
+  // Safety check: re-confirm no access list already exists before overwriting one.
+  // Safety: only proceed if we can positively confirm no access list exists.
+  // A storage error is NOT proof the key is missing, so in that case we refuse
+  // rather than risk replacing a team's existing access codes.
+  const recheck = await storageGet('greyroom:access-list');
+  if(recheck && recheck.value){
+    const existing = JSON.parse(recheck.value);
+    if(existing.length > 0){
+      errEl.innerHTML = 'An access list already exists for this app — creating a new owner would replace it. Please <a href="#" onclick="location.reload();return false;" style="color:var(--brass-bright);">reload</a> and log in with your existing access code instead.';
+      return;
+    }
+  } else if(!bootstrapOverride){
+    bootstrapOverride = true;
+    errEl.innerHTML = 'Storage did not respond, so this page cannot confirm whether your team already has access set up. '
+      + 'If this is a brand-new link, it is safe to continue. If your team already had access on this same link, continuing could replace it — '
+      + '<a href="#" onclick="location.reload();return false;" style="color:var(--brass-bright);">reload</a> and try again instead. '
+      + '<br><br><b style="color:var(--brass-bright);">Press "Create owner access" once more to continue anyway.</b>';
+    return;
+  }
+
+  accessList = [{ id: uid(), name, code, role: 'admin', addedAt: new Date().toISOString() }];
+  const result = await storageSet('greyroom:access-list', JSON.stringify(accessList));
+  session = { name, code, role: 'admin' };
+  if(!result){
+    // Storage refused the write. Still let the owner in so they aren't locked out and can
+    // use Backup & restore, but make the risk explicit.
+    showToast('Signed in, but your access code could not be saved — download a backup now');
+  }
+  await logActivity('created the owner access code and set up Greyroom Reservations');
+  enterApp();
+  if(!result){
+    const wrap = document.querySelector('.wrap');
+    if(wrap){
+      const warn = document.createElement('div');
+      warn.style.cssText = 'background:#4a2320;color:#f0c0b8;border:1px solid #8a3a2c;border-radius:8px;padding:12px 14px;font-size:12.5px;margin-bottom:18px;';
+      warn.innerHTML = 'Your owner access code could not be written to storage, so it may not survive a reload. '
+        + 'Go to <b>Manage access → Backup &amp; restore</b> and download a backup file now.';
+      wrap.insertBefore(warn, wrap.firstChild);
+    }
+  }
+}
+
+async function doLogin(){
+  const code = document.getElementById('login-code').value.trim().toUpperCase();
+  document.getElementById('gateError').textContent = '';
+  if(!code){ document.getElementById('gateError').textContent = 'Enter your access code.'; return; }
+  const match = accessList.find(p => p.code.toUpperCase() === code);
+  if(!match){ document.getElementById('gateError').textContent = 'That access code was not recognized.'; return; }
+  session = { name: match.name, code: match.code, role: match.role };
+  await logActivity('signed in');
+  enterApp();
+}
+
+async function doLogout(){
+  await logActivity('signed out');
+  session = null;
+  document.getElementById('appScreen').style.display = 'none';
+  document.getElementById('gateScreen').style.display = 'flex';
+  document.getElementById('login-code').value = '';
+  document.getElementById('gateError').textContent = '';
+}
+
+async function enterApp(){
+  document.getElementById('gateScreen').style.display = 'none';
+  document.getElementById('appScreen').style.display = 'block';
+  document.getElementById('whoName').textContent = session.name;
+  const roleEl = document.getElementById('whoRole');
+  roleEl.textContent = session.role;
+  document.getElementById('adminTabBtn').style.display = session.role === 'admin' ? 'inline-block' : 'none';
+
+  isViewer = session.role === 'viewer';
+  document.getElementById('intakeFormContent').style.display = isViewer ? 'none' : 'block';
+  document.getElementById('intakeViewOnlyMsg').style.display = isViewer ? 'block' : 'none';
+  document.getElementById('expenseFormContent').style.display = isViewer ? 'none' : 'block';
+  document.getElementById('expenseViewOnlyMsg').style.display = isViewer ? 'block' : 'none';
+  const importRow = document.getElementById('excelImportInput');
+  if(importRow) importRow.previousElementSibling.style.display = isViewer ? 'none' : 'inline-block';
+  document.getElementById('exportPanel').style.display = session.role === 'admin' ? 'block' : 'none';
+  document.getElementById('recalcPanel').style.display = session.role === 'admin' ? 'block' : 'none';
+
+  await loadData();
+}
+
+// ---------------- Data ----------------
+async function loadData(){
+  const propsRes = await storageGet('greyroom:properties');
+  properties = propsRes && propsRes.value ? JSON.parse(propsRes.value) : [...DEFAULT_PROPERTIES];
+  if(!propsRes) await storageSet('greyroom:properties', JSON.stringify(properties));
+
+  const pendRes = await storageGet('greyroom:pending');
+  pending = pendRes && pendRes.value ? JSON.parse(pendRes.value) : [];
+
+  const confRes = await storageGet('greyroom:confirmed');
+  confirmed = confRes && confRes.value ? JSON.parse(confRes.value) : [];
+
+  const expRes = await storageGet('greyroom:expenses');
+  expenses = expRes && expRes.value ? JSON.parse(expRes.value) : [];
+
+  const handRes = await storageGet('greyroom:handovers');
+  handovers = handRes && handRes.value ? JSON.parse(handRes.value) : [];
+
+  const histRes = await storageGet('greyroom:historical-analysis');
+  historicalAnalysis = histRes && histRes.value ? JSON.parse(histRes.value) : { months: [], sales: {}, expense: {}, revenue: {} };
+
+  const monthsRes = await storageGet('greyroom:months');
+  months = monthsRes && monthsRes.value ? JSON.parse(monthsRes.value) : [];
+  if(months.length === 0){
+    months = ["July'26"];
+    await storageSet('greyroom:months', JSON.stringify(months));
+  }
+
+  // Normalize smart/curly apostrophes (mobile keyboards often auto-convert ' to ’),
+  // which otherwise silently breaks exact-match filtering between month tabs and entries.
+  let monthsChanged = false;
+  const normalizedMonths = [];
+  months.forEach(m => {
+    const norm = normalizeMonthLabel(m);
+    if(norm !== m) monthsChanged = true;
+    if(!normalizedMonths.includes(norm)) normalizedMonths.push(norm);
+  });
+  if(normalizedMonths.length !== months.length) monthsChanged = true;
+  months = normalizedMonths;
+  if(monthsChanged) await saveMonths();
+
+  currentMonth = months[months.length - 1];
+
+  // Migrate any entries saved before month-tracking existed — they all belong to the earliest tracked month.
+  // Also normalize any entries whose .month has mismatched punctuation (e.g. curly vs straight apostrophe)
+  // so they line up with the current months list instead of silently disappearing from every tab.
+  let migrated = false;
+  const tagLegacy = (arr) => {
+    arr.forEach(item => {
+      if(!item.month){ item.month = months[0]; migrated = true; return; }
+      const norm = normalizeMonthLabel(item.month);
+      if(norm !== item.month){
+        item.month = months.find(m => normalizeMonthLabel(m) === norm) || norm;
+        migrated = true;
+      }
+    });
+  };
+  tagLegacy(confirmed); tagLegacy(pending); tagLegacy(expenses); tagLegacy(handovers);
+  if(migrated){
+    await saveConfirmed(); await savePending(); await saveExpenses(); await saveHandovers();
+  }
+
+  const logRes = await storageGet('greyroom:activity-log');
+  activityLog = logRes && logRes.value ? JSON.parse(logRes.value) : [];
+
+  renderProperties();
+  renderMonthBar();
+  renderPending();
+  renderConfirmed();
+  renderExpenseLog();
+  renderRequisitionList();
+  renderFinancialReports();
+  renderHandoverReport();
+  renderPeople();
+  renderActivityLog();
+  onCurrencyChange();
+  updateExpensePreview();
+  updateStats();
+
+  try{ await recoverLocalData(true); }catch(e){ console.error('Silent recovery check failed', e); }
+}
+
+async function saveMonths(){ await storageSet('greyroom:months', JSON.stringify(months)); }
+
+async function savePending(){ await storageSet('greyroom:pending', JSON.stringify(pending)); }
+async function saveConfirmed(){ await storageSet('greyroom:confirmed', JSON.stringify(confirmed)); }
+async function saveExpenses(){ await storageSet('greyroom:expenses', JSON.stringify(expenses)); }
+async function saveHandovers(){ await storageSet('greyroom:handovers', JSON.stringify(handovers)); }
+async function saveHistoricalAnalysis(){ await storageSet('greyroom:historical-analysis', JSON.stringify(historicalAnalysis)); }
+async function saveProperties(){ await storageSet('greyroom:properties', JSON.stringify(properties)); }
+async function saveAccessList(){ await storageSet('greyroom:access-list', JSON.stringify(accessList)); }
+
+// ---------------- Excel import (historical sales sheet) ----------------
+const PLATFORM_MAP = {
+  'airbnb.com': 'Airbnb',
+  'booking.com': 'Booking.com',
+  'travela': 'Travela',
+  'reffered': 'Referred',
+  'referred': 'Referred',
+  'stayed before': 'Stayed Before'
+};
+const GATEWAY_MAP = {
+  'payoneer': 'Payoneer',
+  'cash': 'Cash',
+  'saif bkash': 'Saif Bkash',
+  'merchant': 'Bkash Merchant',
+  'brac': 'Brac Bank'
+};
+const GREYROOM_ROOM_NOTE = 'Imported from sales sheet — property recorded only as "Greyroom" (one of Executive Lounge / Lofted Oasis / Urban Oasis / Cozy Executive). Please update the specific room.';
+
+function normalizeForMatch(name){
+  return String(name || '').trim().toLowerCase().replace(/^the\s+/, '').replace(/\s+/g, ' ');
+}
+function mapProperty(raw, extraNames){
+  if(!raw) return 'Greyroom';
+  const v = String(raw).trim();
+  if(v.toLowerCase() === 'greyroom') return 'Greyroom';
+  const norm = normalizeForMatch(v);
+  const existingMatch = properties.find(p => normalizeForMatch(p) === norm);
+  if(existingMatch) return existingMatch;
+  if(extraNames){
+    for(const name of extraNames){
+      if(normalizeForMatch(name) === norm) return name;
+    }
+  }
+  return v;
+}
+
+function parseExcelDateToISO(val){
+  if(val === null || val === undefined || val === '') return '';
+  if(val instanceof Date && !isNaN(val)){
+    // SheetJS (cellDates:true) constructs dates to be correct when read with LOCAL getters —
+    // per SheetJS docs: "the dates will be correct when interpreted in local time."
+    const y = val.getFullYear(), m = String(val.getMonth()+1).padStart(2,'0'), d = String(val.getDate()).padStart(2,'0');
+    return `${y}-${m}-${d}`;
+  }
+  const s = String(val).trim();
+  if(!s) return '';
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; // already ISO
+  const m1 = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/); // DD/MM/YYYY or DD-MM-YYYY
+  if(m1){
+    const day = m1[1].padStart(2,'0'), mon = m1[2].padStart(2,'0'), yr = m1[3];
+    return `${yr}-${mon}-${day}`;
+  }
+  const parsed = new Date(s);
+  if(!isNaN(parsed)){
+    const y = parsed.getFullYear(), m = String(parsed.getMonth()+1).padStart(2,'0'), d = String(parsed.getDate()).padStart(2,'0');
+    return `${y}-${m}-${d}`;
+  }
+  return '';
+}
+
+function categorizeExpenseItem(name){
+  const n = name.toLowerCase();
+  if(/salary|allowance/.test(n)) return 'Staff / Labor';
+  if(/electric|gas\s*bill|internet|water\s*bill|\bbill\b/.test(n)) return 'Utilities';
+  if(/repair|servicing|pipe|switch|chabi|remote|lock/.test(n)) return 'Maintenance';
+  if(/shower gel|shampoo|\bsoap\b|toilet tissue|facial tissue|\btissue\b|good night|sandal|toothbrush|amenit/.test(n)) return 'Guest Amenities';
+  if(/wash|aerosol|freshener|cleaner|poly|harpic|dustbin|sofa cover|off day/.test(n)) return 'Cleaning';
+  if(/payment|charge|commission/.test(n)) return 'Other';
+  return 'Supplies';
+}
+
+function findExpenseBlocksInSheet(rows){
+  const blocks = [];
+  for(let r = 0; r < rows.length; r++){
+    const row = rows[r] || [];
+    for(let c = 0; c < row.length; c++){
+      const cell = row[c];
+      if(String(cell||'').trim().toLowerCase() !== 'expense item') continue;
+      const itemCol = c;
+      const amountCol = c + 1;
+
+      // Title is on the row directly above, usually at or near the same column
+      const titleRow = rows[r-1] || [];
+      let title = null;
+      for(let cc = Math.max(0, itemCol-1); cc <= itemCol+1 && cc < titleRow.length; cc++){
+        const v = titleRow[cc];
+        if(typeof v === 'string' && v.trim()){ title = v.trim(); break; }
+      }
+      if(!title) continue;
+      title = title.replace(/\s*EXPENSE$/i, '').trim(); // strip suffix when present, with or without a space (e.g. "GREYROOM EXPENSE" -> "GREYROOM", "VANTAGEEXPENSE" -> "VANTAGE")
+
+      const items = [];
+      let rr = r + 1;
+      while(rr < rows.length){
+        const line = rows[rr] || [];
+        const itemVal = line[itemCol];
+        const amtVal = line[amountCol];
+        if(itemVal === null || itemVal === undefined || String(itemVal).trim() === '') break;
+        if(String(itemVal).trim().toLowerCase() === 'total') break;
+        if(typeof amtVal === 'number') items.push({ item: String(itemVal).trim(), amount: amtVal });
+        rr++;
+      }
+      if(items.length > 0) blocks.push({ title, items });
+    }
+  }
+  return blocks;
+}
+
+function findHistoricalTablesInSheet(rows){
+  const tables = [];
+  for(let r = 0; r < rows.length; r++){
+    const row = rows[r] || [];
+    const propCol = row.findIndex(c => String(c||'').trim().toLowerCase() === 'property name');
+    if(propCol === -1) continue;
+
+    const monthCols = [];
+    for(let cc = propCol + 1; cc < row.length; cc++){
+      const v = row[cc];
+      if(v === null || v === undefined || String(v).trim() === '') break;
+      monthCols.push({ col: cc, label: String(v).trim() });
+    }
+    if(monthCols.length === 0) continue;
+
+    let type = 'Sales';
+    outer:
+    for(let back = 1; back <= 5 && r - back >= 0; back++){
+      for(const cell of (rows[r-back] || [])){
+        if(typeof cell === 'string'){
+          if(/expense by property/i.test(cell)){ type = 'Expense'; break outer; }
+          if(/revenue by property/i.test(cell)){ type = 'Revenue'; break outer; }
+          if(/sales by property/i.test(cell)){ type = 'Sales'; break outer; }
+        }
+      }
+    }
+
+    const data = {};
+    let rr = r + 1;
+    while(rr < rows.length){
+      const line = rows[rr] || [];
+      const propRaw = line[propCol];
+      if(propRaw === null || propRaw === undefined || String(propRaw).trim() === '') break;
+      if(String(propRaw).trim().toLowerCase() === 'total') break;
+      data[String(propRaw).trim()] = monthCols.map(mc => {
+        const v = line[mc.col];
+        return typeof v === 'number' ? v : null;
+      });
+      rr++;
+    }
+    tables.push({ type, months: monthCols.map(m => m.label), data });
+  }
+  return tables;
+}
+
+async function handleExcelImport(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('importStatus');
+  statusEl.textContent = `Reading file… (importing into ${currentMonth})`;
+
+  try{
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array', cellDates: true });
+
+    // ---- Pass 1: booking/sales rows — find the sheet with a "Guest name" header ----
+    let bookingsImported = 0;
+    let splitPaymentsFound = 0;
+    let handoversImported = 0;
+    const importedHandovers = [];
+    const newProps = new Set();
+    let salesSheetFound = false;
+
+    // Duplicate guards: an entry counts as already-present if an identical one exists
+    // in the SAME month (the dedupe keys include .month), so re-importing a sheet only
+    // adds genuinely new rows and re-importing into a different month still works.
+    let skippedBookings = 0, skippedExpenses = 0, skippedHandovers = 0;
+    const existingBookingKeys = new Set(confirmed.map(bookingDedupeKey));
+    const existingExpenseKeys = new Set(expenses.map(expenseDedupeKey));
+    const existingHandoverKeys = new Set(handovers.map(handoverDedupeKey));
+
+    for(const sheetName of wb.SheetNames){
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: null });
+      const headerIdx = rows.findIndex(r => r.some(cell => String(cell||'').trim().toLowerCase() === 'guest name'));
+      if(headerIdx === -1) continue;
+      salesSheetFound = true;
+      const dataRows = [];
+      for(let i = headerIdx + 1; i < rows.length; i++){
+        const r = rows[i];
+        const isBlankRow = !r || r.every(cell => cell === null || cell === undefined || String(cell).trim() === '');
+        if(isBlankRow) break; // sales table ends at the first fully-blank row — anything after (e.g. expense grids) is a different section
+        if(r[1] && typeof r[0] === 'number') dataRows.push(r);
+      }
+      const importedBatch = [];
+
+      for(const r of dataRows){
+        const guest = String(r[1]||'').trim();
+        if(!guest) continue;
+        const property = mapProperty(r[2], newProps);
+        const platformRaw = String(r[4]||'').trim().toLowerCase();
+        const platform = PLATFORM_MAP[platformRaw] || (r[4] ? String(r[4]).trim() : 'Airbnb');
+
+        const usd = r[5];
+        const noyon = r[6], saifCol = r[7], handover = r[8], brac = r[9], payonner = r[10], bkashMarchent = r[11];
+        const phone = r[12] !== undefined && r[12] !== null ? String(r[12]).trim() : '';
+        const checkin = parseExcelDateToISO(r[13]);
+        const checkout = parseExcelDateToISO(r[14]);
+
+        // Build one "bucket" per gateway that actually has money against it on this row.
+        // A row can have more than one bucket — that means the reservation's payment
+        // was split across gateways (e.g. part cash, part Bkash Merchant) and each
+        // portion needs its own entry so gateway-wise and property-wise totals stay accurate.
+        // Note: "Handover" is NOT sales revenue — it's a separate internal figure (how much
+        // cash has been handed over) and is tracked on its own, never added into Cash/any gateway.
+        const buckets = [];
+        if(typeof usd === 'number' || typeof payonner === 'number'){
+          buckets.push({
+            gateway: 'Payoneer', currency: 'USD',
+            amount: typeof usd === 'number' ? usd : null,
+            bdtNote: typeof payonner === 'number' ? payonner : null
+          });
+        }
+        if(typeof noyon === 'number' && noyon > 0){
+          buckets.push({ gateway: 'Cash', currency: 'BDT', amount: noyon });
+        }
+        if(typeof saifCol === 'number') buckets.push({ gateway: 'Saif Bkash', currency: 'BDT', amount: saifCol });
+        if(typeof brac === 'number') buckets.push({ gateway: 'Brac Bank', currency: 'BDT', amount: brac });
+        if(typeof bkashMarchent === 'number') buckets.push({ gateway: 'Bkash Merchant', currency: 'BDT', amount: bkashMarchent });
+
+        if(typeof handover === 'number' && handover > 0){
+          const hEntry = {
+            id: uid(), property, guest, amount: handover, date: '', month: currentMonth,
+            notes: 'Imported from Greyroom sales sheet.',
+            addedBy: session.name, addedAt: new Date().toISOString()
+          };
+          const hKey = handoverDedupeKey(hEntry);
+          if(existingHandoverKeys.has(hKey)){
+            skippedHandovers++;
+          } else {
+            existingHandoverKeys.add(hKey);
+            importedHandovers.push(hEntry);
+            handoversImported++;
+          }
+        }
+
+        if(buckets.length === 0){
+          // No amount recorded anywhere for this row — still import the guest/property so it's visible, flagged for follow-up.
+          const gatewayRaw = String(r[3]||'').trim().toLowerCase();
+          buckets.push({ gateway: GATEWAY_MAP[gatewayRaw] || (r[3] ? String(r[3]).trim() : 'Cash'), currency: 'BDT', amount: null });
+        }
+
+        const isSplit = buckets.length > 1;
+        if(isSplit) splitPaymentsFound++;
+
+        buckets.forEach((bucket, idx) => {
+          const notesParts = ['Imported from Greyroom sales sheet.'];
+          if(bucket.bdtNote) notesParts.push(`Source sheet recorded BDT received: BDT ${bucket.bdtNote.toLocaleString('en-IN')}.`);
+          if(isSplit) notesParts.push(`Split payment — portion ${idx+1} of ${buckets.length} gateways for this reservation.`);
+          if(property === 'Greyroom') notesParts.push(GREYROOM_ROOM_NOTE);
+
+          const bEntry = {
+            id: uid(), property, platform, ref: '', guest,
+            checkin, checkout, contact: phone, month: currentMonth,
+            currency: bucket.currency, amount: bucket.amount, gateway: bucket.gateway,
+            notes: notesParts.join(' '),
+            addedBy: session.name, addedAt: new Date().toISOString(),
+            confirmedBy: session.name, confirmedAt: new Date().toISOString(),
+            needsCompletion: !checkin || !checkout || !phone
+          };
+          const bKey = bookingDedupeKey(bEntry);
+          if(existingBookingKeys.has(bKey)){
+            skippedBookings++;
+          } else {
+            existingBookingKeys.add(bKey);
+            importedBatch.push(bEntry);
+            bookingsImported++;
+          }
+        });
+        if(property !== 'Greyroom' && !properties.includes(property)) newProps.add(property);
+      }
+
+      if(importedBatch.length > 0){
+        confirmed = [...importedBatch, ...confirmed];
+      }
+    }
+    if(importedHandovers.length > 0){
+      handovers = [...importedHandovers, ...handovers];
+    }
+
+    // ---- Pass 2: expense grids — scan every sheet for "<PROPERTY> EXPENSE" blocks ----
+    let expensesImported = 0;
+    const importedExpenses = [];
+    for(const sheetName of wb.SheetNames){
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: null });
+      const blocks = findExpenseBlocksInSheet(rows);
+      for(const block of blocks){
+        const property = mapProperty(block.title, newProps);
+        if(property !== 'Greyroom' && !properties.includes(property)) newProps.add(property);
+        for(const item of block.items){
+          const eEntry = {
+            id: uid(), property, category: categorizeExpenseItem(item.item),
+            date: '', currency: 'BDT', amount: item.amount, month: currentMonth,
+            item: item.item,
+            notes: 'Imported from expense sheet',
+            addedBy: session.name, addedAt: new Date().toISOString()
+          };
+          const eKey = expenseDedupeKey(eEntry);
+          if(existingExpenseKeys.has(eKey)){
+            skippedExpenses++;
+          } else {
+            existingExpenseKeys.add(eKey);
+            importedExpenses.push(eEntry);
+            expensesImported++;
+          }
+        }
+      }
+    }
+    if(importedExpenses.length > 0){
+      expenses = [...importedExpenses, ...expenses];
+    }
+
+    // ---- Pass 3: historical monthly Sales/Expense/Revenue-by-property tables ----
+    let historicalMonthsImported = 0;
+    const TYPE_KEY = { Sales: 'sales', Expense: 'expense', Revenue: 'revenue' };
+    for(const sheetName of wb.SheetNames){
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: null });
+      const tables = findHistoricalTablesInSheet(rows);
+      for(const table of tables){
+        const key = TYPE_KEY[table.type];
+        if(!key) continue;
+
+        // Drop trailing month columns that are entirely blank (e.g. an unfilled "current month" column
+        // meant to be calculated live from the app instead of trusted from the sheet).
+        let months = [...table.months];
+        while(months.length > 0){
+          const lastIdx = months.length - 1;
+          const allBlank = Object.values(table.data).every(vals => vals[lastIdx] === null || vals[lastIdx] === undefined);
+          if(allBlank) months.pop(); else break;
+        }
+        if(months.length === 0) continue;
+
+        // Merge month list (union, preserving order of first-seen sheet)
+        if(historicalAnalysis.months.length === 0){
+          historicalAnalysis.months = months;
+        }
+
+        for(const [rawProp, values] of Object.entries(table.data)){
+          const property = mapProperty(rawProp, newProps);
+          if(property !== 'Greyroom' && !properties.includes(property)) newProps.add(property);
+          historicalAnalysis[key][property] = values.slice(0, months.length).map(v => (typeof v === 'number' ? v : null));
+        }
+        historicalMonthsImported += months.length;
+      }
+    }
+
+    const totalSkipped = skippedBookings + skippedExpenses + skippedHandovers;
+
+    if(bookingsImported === 0 && expensesImported === 0 && handoversImported === 0 && historicalMonthsImported === 0){
+      if(totalSkipped > 0){
+        statusEl.textContent = `Nothing new to import — all ${totalSkipped} row(s) in this file already exist in ${currentMonth}. No duplicates were added.`;
+        showToast('Already up to date');
+        return;
+      }
+      statusEl.textContent = salesSheetFound
+        ? 'No expense grids or booking rows with a guest name were found to import.'
+        : 'Could not find a "Guest name" column, any "<Property> EXPENSE" grids, or a "Property Name" historical table — is this the right file?';
+      return;
+    }
+
+    if(bookingsImported > 0) await saveConfirmed();
+    if(expensesImported > 0) await saveExpenses();
+    if(handoversImported > 0) await saveHandovers();
+    if(historicalMonthsImported > 0) await saveHistoricalAnalysis();
+
+    if(newProps.size > 0){
+      properties = [...properties, ...Array.from(newProps)];
+      await saveProperties();
+      renderProperties();
+    }
+
+    renderConfirmed();
+    renderExpenseLog();
+  renderRequisitionList();
+    renderHandoverReport();
+    updateStats();
+    renderFinancialReports();
+
+    const parts = [];
+    if(bookingsImported > 0) parts.push(`${bookingsImported} booking entr${bookingsImported===1?'y':'ies'} (flagged "Needs completion" for check-in/check-out/phone)`);
+    if(splitPaymentsFound > 0) parts.push(`${splitPaymentsFound} reservation(s) had payment split across multiple gateways — each portion recorded separately so gateway totals stay accurate`);
+    if(handoversImported > 0) parts.push(`${handoversImported} handover amount(s) tracked separately (not counted as sales)`);
+    if(expensesImported > 0) parts.push(`${expensesImported} expense line(s) across ${new Set(importedExpenses.map(e=>e.property)).size} propert${new Set(importedExpenses.map(e=>e.property)).size===1?'y':'ies'}`);
+    if(historicalMonthsImported > 0) parts.push(`historical analysis updated (${historicalAnalysis.months.join(', ')})`);
+    if(totalSkipped > 0){
+      const sk = [];
+      if(skippedBookings) sk.push(`${skippedBookings} booking`);
+      if(skippedExpenses) sk.push(`${skippedExpenses} expense`);
+      if(skippedHandovers) sk.push(`${skippedHandovers} handover`);
+      parts.push(`skipped ${sk.join(', ')} row(s) already in ${currentMonth}`);
+    }
+    statusEl.textContent = `Imported: ${parts.join('. ')}.`;
+    showToast('Import complete');
+    logActivity(`imported ${bookingsImported} booking entries (${splitPaymentsFound} split-payment reservations), ${handoversImported} handover records, ${expensesImported} expense lines into ${currentMonth}; skipped ${totalSkipped} duplicate row(s)`);
+  }catch(e){
+    console.error('Excel import failed', e);
+    statusEl.textContent = 'Import failed: ' + (e && e.message ? e.message : 'unknown error');
+  } finally {
+    event.target.value = '';
+  }
+}
+
+
+// ---------------- Tabs ----------------
+function normalizeMonthLabel(str){
+  return String(str || '').trim()
+    .replace(/[\u2018\u2019\u02BC\u00B4`]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/\s+/g, ' ');
+}
+
+function renderMonthBar(){
+  const bar = document.getElementById('monthBar');
+  if(!bar) return;
+  let html = months.map(m => `<button class="month-pill ${m===currentMonth?'active':''}" onclick="switchMonth('${jsAttrEscape(m)}')">${escapeHtml(m)}</button>`).join('');
+  if(session && session.role === 'admin'){
+    html += `<input id="newMonthInput" placeholder="e.g. August'26"><button class="month-pill add" onclick="addMonth()">+ Add month</button>`;
+  }
+  bar.innerHTML = html;
+}
+
+function refreshAllTabsForMonth(){
+  renderPending();
+  renderConfirmed();
+  renderExpenseLog();
+  renderRequisitionList();
+  renderFinancialReports();
+  renderHandoverReport();
+  updateStats();
+  renderStatistics();
+  renderAnalysisTab();
+}
+
+function switchMonth(m){
+  currentMonth = m;
+  renderMonthBar();
+  refreshAllTabsForMonth();
+}
+
+async function addMonth(){
+  if(session.role !== 'admin'){ showToast('Only admins can add months'); return; }
+  const input = document.getElementById('newMonthInput');
+  const val = normalizeMonthLabel(input.value);
+  if(!val){ showToast('Enter a month label, e.g. August\'26'); return; }
+  if(months.includes(val)){ showToast('That month already exists'); switchMonth(val); return; }
+  months.push(val);
+  await saveMonths();
+  input.value = '';
+  currentMonth = val;
+  renderMonthBar();
+  refreshAllTabsForMonth();
+  logActivity(`added a new month: ${val}`);
+  showToast(`${val} added`);
+}
+
+function switchTab(tab){
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.getElementById('tab-reservations').style.display = tab === 'reservations' ? 'block' : 'none';
+  document.getElementById('tab-financials').style.display = tab === 'financials' ? 'block' : 'none';
+  document.getElementById('tab-statistics').style.display = tab === 'statistics' ? 'block' : 'none';
+  document.getElementById('tab-analysis').style.display = tab === 'analysis' ? 'block' : 'none';
+  document.getElementById('tab-admin').style.display = tab === 'admin' ? 'block' : 'none';
+  if(tab === 'statistics') renderStatistics();
+  if(tab === 'analysis') renderAnalysisTab();
+}
+
+// ---------------- Properties ----------------
+function renderProperties(){
+  const sel = document.getElementById('f-property');
+  sel.innerHTML = properties.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
+  const exSel = document.getElementById('ex-property');
+  if(exSel) exSel.innerHTML = properties.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
+  const tags = document.getElementById('propTags');
+  tags.innerHTML = properties.map((p,i) => `<span class="prop-tag">${escapeHtml(p)} <button onclick="removeProperty(${i})">×</button></span>`).join('');
+}
+async function addProperty(){
+  const input = document.getElementById('newPropInput');
+  const val = input.value.trim();
+  if(!val) return;
+  if(properties.includes(val)){ showToast('Already in the list'); return; }
+  properties.push(val); input.value = '';
+  await saveProperties(); renderProperties();
+  logActivity(`added property "${val}"`);
+}
+async function removeProperty(i){
+  const val = properties[i];
+  properties.splice(i,1);
+  await saveProperties(); renderProperties();
+  logActivity(`removed property "${val}"`);
+}
+
+// ---------------- Pending / Confirmed ----------------
+async function addPending(){
+  const property = document.getElementById('f-property').value;
+  const platform = document.getElementById('f-platform').value;
+  const ref = document.getElementById('f-ref').value.trim();
+  const guest = document.getElementById('f-guest').value.trim();
+  const checkin = document.getElementById('f-checkin').value;
+  const checkout = document.getElementById('f-checkout').value;
+  const contact = document.getElementById('f-contact').value.trim();
+  const currency = document.getElementById('f-currency').value;
+  const amount = document.getElementById('f-amount').value;
+  const gateway = document.getElementById('f-gateway').value;
+  const notes = document.getElementById('f-notes').value.trim();
+
+  if(!guest || !checkin || !checkout || !contact){
+    showToast('Guest name, check-in, check-out and phone number are required');
+    return;
+  }
+  if(new Date(checkout) <= new Date(checkin)){ showToast('Check-out must be after check-in'); return; }
+
+  const entry = {
+    id: uid(), property, platform, ref, guest, checkin, checkout, contact,
+    currency, amount, gateway, notes, month: currentMonth,
+    addedBy: session.name, addedAt: new Date().toISOString()
+  };
+  pending.unshift(entry);
+  await savePending();
+  renderPending(); updateStats(); clearForm();
+  showToast('Added to pending queue');
+  logActivity(`added a pending booking for ${guest} (${property})`);
+}
+function clearForm(){
+  ['f-ref','f-guest','f-checkin','f-checkout','f-amount','f-contact','f-notes'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-currency').value = 'BDT';
+  document.getElementById('f-gateway').selectedIndex = 0;
+  onCurrencyChange();
+}
+function renderPending(){
+  const el = document.getElementById('pendingList');
+  const scoped = pending.filter(p => p.month === currentMonth);
+  if(scoped.length === 0){ el.innerHTML = '<div class="empty">No bookings waiting for review.</div>'; return; }
+  el.innerHTML = scoped.map(p => `
+    <div class="card pending">
+      <div class="card-top">
+        <div class="card-title">${escapeHtml(p.guest)} — ${escapeHtml(p.property)}</div>
+        <div class="card-plat">${escapeHtml(p.platform)}</div>
+      </div>
+      <div class="card-meta">
+        <b>${fmtDate(p.checkin)} → ${fmtDate(p.checkout)}</b> · ${nights(p.checkin,p.checkout)} night(s)<br>
+        ${p.amount ? fmtReceived(p.amount, p.currency) : 'Amount not set'}${p.currency === 'USD' && p.amount ? ' (≈ ' + fmtBdtEquivalent(p.amount, p.currency) + ')' : ''}
+        ${p.gateway ? ' · ' + escapeHtml(p.gateway) : ''}
+        ${p.ref ? ' · Ref: ' + escapeHtml(p.ref) : ''}
+        <br>Phone: ${escapeHtml(p.contact)}
+      </div>
+      ${p.notes ? `<div class="card-notes">"${escapeHtml(p.notes)}"</div>` : ''}
+      ${isViewer ? '' : `
+      <div class="card-actions">
+        <button class="accept-btn" onclick="acceptBooking('${p.id}')">Accept → Confirm</button>
+        <button class="reject-btn" onclick="rejectBooking('${p.id}')">Reject</button>
+      </div>`}
+    </div>
+  `).join('');
+}
+async function acceptBooking(id){
+  const idx = pending.findIndex(p => p.id === id);
+  if(idx === -1) return;
+  const entry = pending[idx];
+  entry.confirmedBy = session.name;
+  entry.confirmedAt = new Date().toISOString();
+  confirmed.unshift(entry);
+  pending.splice(idx,1);
+  await savePending(); await saveConfirmed();
+  renderPending(); renderConfirmed(); updateStats(); renderFinancialReports();
+  showToast('Confirmed and added to database');
+  logActivity(`accepted the booking for ${entry.guest} (${entry.property})`);
+}
+async function rejectBooking(id){
+  const idx = pending.findIndex(p => p.id === id);
+  if(idx === -1) return;
+  const entry = pending[idx];
+  pending.splice(idx,1);
+  await savePending();
+  renderPending(); updateStats();
+  showToast('Booking rejected');
+  logActivity(`rejected the booking for ${entry.guest} (${entry.property})`);
+}
+function renderConfirmed(){
+  const q = (document.getElementById('dbSearch').value || '').toLowerCase();
+  const body = document.getElementById('confirmedBody');
+  const emptyEl = document.getElementById('confirmedEmpty');
+  const monthScoped = confirmed.filter(c => c.month === currentMonth);
+  const filtered = monthScoped.filter(c => !q ||
+    (c.guest||'').toLowerCase().includes(q) || (c.property||'').toLowerCase().includes(q) || (c.ref||'').toLowerCase().includes(q) || (c.contact||'').toLowerCase().includes(q));
+  if(filtered.length === 0){
+    body.innerHTML = '';
+    emptyEl.style.display = 'block';
+    emptyEl.textContent = monthScoped.length === 0 ? `No confirmed bookings yet for ${escapeHtml(currentMonth)}. Accept a pending booking to add it here.` : 'No matches for your search.';
+    return;
+  }
+  emptyEl.style.display = 'none';
+  body.innerHTML = filtered.map((c,i) => `
+    <tr${c.needsCompletion ? ' style="background:rgba(176,141,87,0.06);"' : ''}>
+      <td>${i+1}</td>
+      <td>${escapeHtml(c.property)}</td>
+      <td><span class="plat-pill">${escapeHtml(c.platform)}</span></td>
+      <td>${escapeHtml(c.guest)}</td>
+      <td>${c.needsCompletion && !c.contact ? '<span style="color:var(--brass-bright);font-size:11px;">needs phone</span>' : escapeHtml(c.contact || '—')}</td>
+      <td>${c.needsCompletion && !c.checkin ? '<span style="color:var(--brass-bright);font-size:11px;">needs date</span>' : fmtDate(c.checkin)}</td>
+      <td>${c.needsCompletion && !c.checkout ? '<span style="color:var(--brass-bright);font-size:11px;">needs date</span>' : fmtDate(c.checkout)}</td>
+      <td>${fmtReceived(c.amount, c.currency)}</td>
+      <td>${fmtBdtEquivalent(c.amount, c.currency)}</td>
+      <td>${escapeHtml(c.gateway || '—')}</td>
+      <td>${isViewer ? '' : `<button class="btn-ghost" style="margin:0;padding:5px 10px;font-size:11px;" onclick="removeConfirmed('${c.id}')">Remove</button>`}</td>
+    </tr>
+  `).join('');
+}
+async function removeConfirmed(id){
+  const idx = confirmed.findIndex(c => c.id === id);
+  if(idx === -1) return;
+  const entry = confirmed[idx];
+  confirmed.splice(idx,1);
+  await saveConfirmed();
+  renderConfirmed(); updateStats(); renderFinancialReports();
+  showToast('Removed from database');
+  logActivity(`removed ${entry.guest}'s confirmed booking (${entry.property})`);
+}
+function updateStats(){
+  document.getElementById('statPending').textContent = pending.filter(p => p.month === currentMonth).length;
+  document.getElementById('statConfirmed').textContent = confirmed.filter(c => c.month === currentMonth).length;
+}
+
+// ---------------- Expenses ----------------
+async function addExpense(){
+  const property = document.getElementById('ex-property').value;
+  const category = document.getElementById('ex-category').value;
+  const date = document.getElementById('ex-date').value;
+  const currency = document.getElementById('ex-currency').value;
+  const amount = document.getElementById('ex-amount').value;
+  const item = document.getElementById('ex-item').value.trim();
+  const notes = document.getElementById('ex-notes').value.trim();
+
+  if(!amount || isNaN(parseFloat(amount))){ showToast('Enter a valid amount'); return; }
+
+  const entry = {
+    id: uid(), property, category, date, currency, amount, month: currentMonth,
+    item: item || category, notes, addedBy: session.name, addedAt: new Date().toISOString()
+  };
+  expenses.unshift(entry);
+  await saveExpenses();
+  renderExpenseLog();
+  renderRequisitionList();
+  renderFinancialReports();
+  document.getElementById('ex-amount').value = '';
+  document.getElementById('ex-item').value = '';
+  document.getElementById('ex-notes').value = '';
+  document.getElementById('ex-date').value = '';
+  showToast('Expense logged');
+  logActivity(`logged an expense of ${fmtReceived(amount, currency)} for ${property} (${category})`);
+}
+async function removeExpense(id){
+  const idx = expenses.findIndex(e => e.id === id);
+  if(idx === -1) return;
+  const entry = expenses[idx];
+  expenses.splice(idx,1);
+  await saveExpenses();
+  renderExpenseLog();
+  renderRequisitionList();
+  renderFinancialReports();
+  showToast('Expense removed');
+  logActivity(`removed an expense entry for ${entry.property}`);
+}
+function parseQtyAndBaseItem(itemText){
+  const text = String(itemText || '').trim();
+  const m = text.match(/^(.*?)[\s\-]*(\d+)\s*pcs?\.?\s*$/i);
+  if(m && m[1].trim()){
+    return { baseItem: m[1].trim().replace(/[-\s]+$/, ''), qty: parseInt(m[2], 10) };
+  }
+  return { baseItem: text || 'Unspecified', qty: 1 };
+}
+
+function populateExpenseLogFilter(){
+  const sel = document.getElementById('expenseLogFilter');
+  if(!sel) return;
+  const current = sel.value || '__all__';
+  const propsInExpenses = Array.from(new Set(expenses.filter(e => e.month === currentMonth).map(e => e.property || 'Unspecified'))).sort();
+  sel.innerHTML = '<option value="__all__">All properties</option>' +
+    propsInExpenses.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
+  if([...sel.options].some(o => o.value === current)) sel.value = current;
+}
+
+function computeMonthlyRequisition(){
+  const monthScoped = expenses.filter(e => e.month === currentMonth);
+  const groups = {}; // key -> { label, category, qty, amount, properties:Set }
+  monthScoped.forEach(e => {
+    const { baseItem, qty } = parseQtyAndBaseItem(e.item || e.category);
+    const key = baseItem.toLowerCase();
+    if(!groups[key]) groups[key] = { label: baseItem, category: e.category || 'Other', qty: 0, amount: 0, properties: new Set() };
+    groups[key].qty += qty;
+    groups[key].amount += toBdtNumber(e.amount, e.currency);
+    groups[key].properties.add(e.property || 'Unspecified');
+  });
+  return Object.values(groups)
+    .map(g => ({ ...g, properties: Array.from(g.properties).sort() }))
+    .sort((a,b) => a.category.localeCompare(b.category) || a.label.localeCompare(b.label));
+}
+
+function renderRequisitionList(){
+  const body = document.getElementById('requisitionBody');
+  const emptyEl = document.getElementById('requisitionEmpty');
+  if(!body) return;
+  const rows = computeMonthlyRequisition();
+  if(rows.length === 0){
+    body.innerHTML = '';
+    if(emptyEl) emptyEl.style.display = 'block';
+    return;
+  }
+  if(emptyEl) emptyEl.style.display = 'none';
+  let lastCategory = null;
+  body.innerHTML = rows.map(r => {
+    const sameCat = r.category === lastCategory;
+    lastCategory = r.category;
+    const propsLabel = r.properties.length === 1 ? escapeHtml(r.properties[0]) : `${r.properties.length} properties (${r.properties.map(escapeHtml).join(', ')})`;
+    return `<tr>
+      <td>${sameCat ? '' : escapeHtml(r.category)}</td>
+      <td>${escapeHtml(r.label)}</td>
+      <td>${r.qty}</td>
+      <td>${propsLabel}</td>
+      <td>BDT ${Math.round(r.amount).toLocaleString('en-IN')}</td>
+    </tr>`;
+  }).join('');
+}
+
+function computeExpenseLogGrouped(){
+  const filterEl = document.getElementById('expenseLogFilter');
+  const filter = filterEl ? filterEl.value : '__all__';
+  const monthScoped = expenses.filter(e => e.month === currentMonth);
+  const scoped = filter === '__all__' ? monthScoped : monthScoped.filter(e => (e.property || 'Unspecified') === filter);
+
+  const groups = {}; // baseItemLower -> { label, qty, amount, properties:Set, ids:[] }
+  scoped.forEach(e => {
+    const { baseItem, qty } = parseQtyAndBaseItem(e.item || e.category);
+    const key = baseItem.toLowerCase();
+    if(!groups[key]) groups[key] = { label: baseItem, qty: 0, amount: 0, properties: new Set(), ids: [] };
+    groups[key].qty += qty;
+    groups[key].amount += toBdtNumber(e.amount, e.currency);
+    groups[key].properties.add(e.property || 'Unspecified');
+    groups[key].ids.push(e.id);
+  });
+
+  return Object.values(groups).sort((a,b) => a.label.localeCompare(b.label));
+}
+
+function renderExpenseLog(){
+  populateExpenseLogFilter();
+  const body = document.getElementById('expenseBody');
+  const emptyEl = document.getElementById('expenseEmpty');
+  if(!body) return;
+  const groups = computeExpenseLogGrouped();
+  if(groups.length === 0){
+    body.innerHTML = '';
+    emptyEl.style.display = 'block';
+    return;
+  }
+  emptyEl.style.display = 'none';
+  body.innerHTML = groups.map(g => {
+    const propsArr = Array.from(g.properties);
+    const propLabel = propsArr.length === 1 ? escapeHtml(propsArr[0]) : `Multiple (${propsArr.length})`;
+    const isMatched = g.ids.length > 1;
+    const removeBtn = (!isViewer && !isMatched)
+      ? `<button class="btn-ghost" style="margin:0;padding:5px 10px;font-size:11px;" onclick="removeExpense('${g.ids[0]}')">Remove</button>`
+      : '';
+    return `<tr>
+      <td>${escapeHtml(g.label)}</td>
+      <td>${g.qty}</td>
+      <td>BDT ${Math.round(g.amount).toLocaleString('en-IN')}</td>
+      <td>${propLabel}</td>
+      <td>${removeBtn}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ---------------- Statistics tab ----------------
+function computeStatsOverview(monthKey){
+  const mk = monthKey || currentMonth;
+  const confirmedM = confirmed.filter(c => c.month === mk);
+  const expensesM = expenses.filter(e => e.month === mk);
+  const handoversM = handovers.filter(h => h.month === mk);
+  const totalSalesBDT = confirmedM.reduce((s,c) => s + toBdtNumber(c.amount, c.currency), 0);
+  const totalExpenseBDT = expensesM.reduce((s,e) => s + toBdtNumber(e.amount, e.currency), 0);
+  const netProfit = totalSalesBDT - totalExpenseBDT;
+  const netMargin = totalSalesBDT > 0 ? (netProfit / totalSalesBDT * 100) : 0;
+  const expenseRatio = totalSalesBDT > 0 ? (totalExpenseBDT / totalSalesBDT * 100) : 0;
+  const totalHandover = handoversM.reduce((s,h) => s + toBdtNumber(h.amount, 'BDT'), 0);
+  return { totalSalesBDT, totalExpenseBDT, netProfit, netMargin, expenseRatio, bookings: confirmedM.length, totalHandover };
+}
+
+function renderStatistics(){
+  const ov = computeStatsOverview();
+  const kpiGrid = document.getElementById('statKpiGrid');
+  if(kpiGrid){
+    kpiGrid.innerHTML = `
+      <div class="kpi-card"><div class="kpi-label">Total Sales</div><div class="kpi-value">BDT ${Math.round(ov.totalSalesBDT).toLocaleString('en-IN')}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Total Expenses</div><div class="kpi-value">BDT ${Math.round(ov.totalExpenseBDT).toLocaleString('en-IN')}</div><div class="kpi-sub">${ov.expenseRatio.toFixed(1)}% of sales</div></div>
+      <div class="kpi-card"><div class="kpi-label">Net Profit</div><div class="kpi-value ${ov.netProfit>=0?'good':'bad'}">BDT ${Math.round(ov.netProfit).toLocaleString('en-IN')}</div><div class="kpi-sub">${ov.netMargin.toFixed(1)}% margin</div></div>
+      <div class="kpi-card"><div class="kpi-label">Bookings</div><div class="kpi-value">${ov.bookings}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Cash Handover</div><div class="kpi-value">BDT ${Math.round(ov.totalHandover).toLocaleString('en-IN')}</div><div class="kpi-sub">not counted in sales</div></div>
+    `;
+  }
+  renderPropertyBars();
+  renderRatioTable();
+  renderCollectionMix();
+  renderHistoricalAnalysis();
+}
+
+function renderPropertyBars(){
+  const el = document.getElementById('statPropertyBars');
+  if(!el) return;
+  const rows = computePropertySummary();
+  if(rows.length === 0){ el.innerHTML = '<div class="empty">No data yet.</div>'; return; }
+  const maxVal = Math.max(...rows.map(r => Math.max(r.sales, r.expense)), 1);
+  el.innerHTML = rows.map(r => `
+    <div class="bar-row">
+      <div class="bar-row-top"><b>${escapeHtml(r.property)}</b><span>Sales BDT ${Math.round(r.sales).toLocaleString('en-IN')} · Net ${r.revenue<0?'-':''}BDT ${Math.round(Math.abs(r.revenue)).toLocaleString('en-IN')}</span></div>
+      <div class="bar-track"><div class="bar-fill-sales" style="width:${(r.sales/maxVal*100).toFixed(1)}%;"></div></div>
+      <div class="bar-track" style="margin-top:4px;"><div class="bar-fill-expense" style="width:${(r.expense/maxVal*100).toFixed(1)}%;"></div></div>
+    </div>
+  `).join('');
+}
+
+function renderRatioTable(){
+  const body = document.getElementById('statRatioBody');
+  if(!body) return;
+  const targetEl = document.getElementById('expenseRatioTarget');
+  const target = targetEl ? (parseFloat(targetEl.value) || 45) : 45;
+  const rows = computePropertySummary();
+  if(rows.length === 0){ body.innerHTML = '<tr><td colspan="4" style="color:#7a756a;">No data yet.</td></tr>'; return; }
+  body.innerHTML = rows.map(r => {
+    const ratio = r.sales > 0 ? (r.expense / r.sales * 100) : 0;
+    const isGood = ratio <= target;
+    return `<tr>
+      <td>${escapeHtml(r.property)}</td>
+      <td>BDT ${Math.round(r.sales).toLocaleString('en-IN')}</td>
+      <td>BDT ${Math.round(r.expense).toLocaleString('en-IN')}</td>
+      <td><span class="ratio-badge ${isGood?'ratio-good':'ratio-bad'}">${ratio.toFixed(1)}%</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderCollectionMix(){
+  const el = document.getElementById('statCollectionMix');
+  if(!el) return;
+  const gw = computeGatewayTotals();
+  const total = gw.reduce((s,g) => s+g.total, 0);
+  if(total <= 0){ el.innerHTML = '<div class="empty">No confirmed sales yet.</div>'; return; }
+  el.innerHTML = gw.filter(g => g.total > 0).sort((a,b) => b.total-a.total).map(g => {
+    const pct = (g.total/total*100);
+    return `<div class="mix-row">
+      <div class="mix-label">${escapeHtml(g.gateway)}</div>
+      <div class="mix-track"><div class="mix-fill" style="width:${pct.toFixed(1)}%;"></div></div>
+      <div class="mix-pct">${pct.toFixed(1)}%</div>
+    </div>`;
+  }).join('');
+}
+
+// ---------------- Historical analysis ----------------
+function padArray(arr, len){
+  const out = (arr || []).slice(0, len);
+  while(out.length < len) out.push(null);
+  return out;
+}
+
+function computeHistoricalSeries(){
+  const histMonths = historicalAnalysis.months || [];
+  const liveMonths = months; // global live-tracked months, e.g. ["July'26","August'26"]
+  const allMonths = [...histMonths, ...liveMonths];
+
+  const livePropSummaryByMonth = {};
+  liveMonths.forEach(mk => {
+    const byProp = {};
+    computePropertySummary(mk).forEach(r => { byProp[r.property] = r; });
+    livePropSummaryByMonth[mk] = byProp;
+  });
+
+  const allProps = new Set([
+    ...Object.keys(historicalAnalysis.sales || {}),
+    ...Object.keys(historicalAnalysis.expense || {}),
+    ...Object.keys(historicalAnalysis.revenue || {}),
+    ...liveMonths.flatMap(mk => Object.keys(livePropSummaryByMonth[mk]))
+  ]);
+
+  const series = {};
+  allProps.forEach(p => {
+    const histSales = padArray(historicalAnalysis.sales && historicalAnalysis.sales[p], histMonths.length);
+    const histExpense = padArray(historicalAnalysis.expense && historicalAnalysis.expense[p], histMonths.length);
+    const histRevenue = padArray(historicalAnalysis.revenue && historicalAnalysis.revenue[p], histMonths.length);
+
+    const liveSales = liveMonths.map(mk => ((livePropSummaryByMonth[mk][p] || {}).sales) || 0);
+    const liveExpense = liveMonths.map(mk => ((livePropSummaryByMonth[mk][p] || {}).expense) || 0);
+    const liveRevenue = liveMonths.map(mk => ((livePropSummaryByMonth[mk][p] || {}).revenue) || 0);
+
+    series[p] = {
+      sales: [...histSales, ...liveSales],
+      expense: [...histExpense, ...liveExpense],
+      revenue: [...histRevenue, ...liveRevenue]
+    };
+  });
+
+  const totalSales = allMonths.map((_, i) => Object.values(series).reduce((s,v) => s + (v.sales[i] || 0), 0));
+  const totalExpense = allMonths.map((_, i) => Object.values(series).reduce((s,v) => s + (v.expense[i] || 0), 0));
+  const totalNet = totalSales.map((s,i) => s - totalExpense[i]);
+
+  return { months: allMonths, series, totalSales, totalExpense, totalNet, properties: Array.from(allProps).sort() };
+}
+
+function buildLineChartSvg(labels, seriesList){
+  const width = 720, height = 260;
+  const padding = { top: 20, right: 20, bottom: 34, left: 60 };
+  const plotW = width - padding.left - padding.right;
+  const plotH = height - padding.top - padding.bottom;
+
+  const allValues = seriesList.flatMap(s => s.values.filter(v => v !== null && v !== undefined));
+  const maxVal = Math.max(...allValues, 1);
+  const minVal = Math.min(0, ...allValues);
+  const range = (maxVal - minVal) || 1;
+
+  const xStep = labels.length > 1 ? plotW / (labels.length - 1) : 0;
+  const yFor = v => padding.top + plotH - ((v - minVal) / range) * plotH;
+  const xFor = i => padding.left + i * xStep;
+
+  let gridLines = '';
+  const gridCount = 4;
+  for(let g = 0; g <= gridCount; g++){
+    const y = padding.top + (plotH / gridCount) * g;
+    const val = maxVal - (range / gridCount) * g;
+    gridLines += `<line x1="${padding.left}" y1="${y.toFixed(1)}" x2="${width-padding.right}" y2="${y.toFixed(1)}" stroke="rgba(237,231,221,0.08)" stroke-width="1"/>`;
+    gridLines += `<text x="${padding.left-8}" y="${(y+4).toFixed(1)}" text-anchor="end" font-size="10" fill="#7a756a">${Math.round(val/1000)}k</text>`;
+  }
+
+  const xLabels = labels.map((l,i) => `<text x="${xFor(i).toFixed(1)}" y="${height-10}" text-anchor="middle" font-size="10" fill="#9a958a">${escapeHtml(l)}</text>`).join('');
+
+  let paths = '';
+  seriesList.forEach(s => {
+    const pts = [];
+    s.values.forEach((v,i) => { if(v !== null && v !== undefined) pts.push(`${xFor(i).toFixed(1)},${yFor(v).toFixed(1)}`); });
+    if(pts.length > 0){
+      paths += `<polyline points="${pts.join(' ')}" fill="none" stroke="${s.color}" stroke-width="2.5"/>`;
+      s.values.forEach((v,i) => {
+        if(v === null || v === undefined) return;
+        paths += `<circle cx="${xFor(i).toFixed(1)}" cy="${yFor(v).toFixed(1)}" r="3.5" fill="${s.color}"/>`;
+      });
+    }
+  });
+
+  const legend = seriesList.map(s => `<span style="display:inline-flex;align-items:center;gap:5px;margin-right:16px;"><span style="width:9px;height:9px;border-radius:2px;background:${s.color};display:inline-block;"></span>${escapeHtml(s.name)}</span>`).join('');
+
+  return `
+    <div style="font-size:11.5px;color:#9a958a;margin-bottom:8px;">${legend}</div>
+    <svg viewBox="0 0 ${width} ${height}" style="width:100%;height:auto;display:block;">
+      ${gridLines}
+      ${paths}
+      ${xLabels}
+    </svg>
+  `;
+}
+
+function renderHistoricalAnalysis(){
+  const emptyEl = document.getElementById('historicalEmpty');
+  const contentEl = document.getElementById('historicalContent');
+  if(!emptyEl || !contentEl) return;
+
+  const hasHistorical = (historicalAnalysis.months || []).length > 0;
+  const hasLiveData = confirmed.length > 0 || expenses.length > 0;
+  if(!hasHistorical && !hasLiveData){
+    emptyEl.style.display = 'block';
+    contentEl.style.display = 'none';
+    return;
+  }
+  emptyEl.style.display = 'none';
+  contentEl.style.display = 'block';
+
+  const data = computeHistoricalSeries();
+
+  const chartWrap = document.getElementById('historicalChartWrap');
+  chartWrap.innerHTML = buildLineChartSvg(data.months, [
+    { name: 'Sales', values: data.totalSales, color: '#C9A46E' },
+    { name: 'Expenses', values: data.totalExpense, color: '#B5533C' },
+    { name: 'Net Profit', values: data.totalNet, color: '#4F7942' }
+  ]);
+
+  const head = document.getElementById('historicalTableHead');
+  head.innerHTML = `<tr><th>Property</th><th>Metric</th>${data.months.map(m => `<th>${escapeHtml(m)}</th>`).join('')}</tr>`;
+
+  const fmtCell = (v, allowNegativeColor) => {
+    if(v === null || v === undefined) return '—';
+    const str = 'BDT ' + Math.round(v).toLocaleString('en-IN');
+    if(allowNegativeColor) return `<span style="color:${v<0?'var(--red)':'var(--green)'};">${str}</span>`;
+    return str;
+  };
+
+  let html = '';
+  data.properties.forEach(p => {
+    const s = data.series[p];
+    html += `<tr><td rowspan="3" style="vertical-align:top;font-weight:600;">${escapeHtml(p)}</td><td>Sales</td>${s.sales.map(v => `<td>${fmtCell(v)}</td>`).join('')}</tr>`;
+    html += `<tr><td>Expense</td>${s.expense.map(v => `<td>${fmtCell(v)}</td>`).join('')}</tr>`;
+    html += `<tr><td>Net</td>${s.revenue.map(v => `<td>${fmtCell(v, true)}</td>`).join('')}</tr>`;
+  });
+  html += `<tr style="font-weight:600;border-top:2px solid var(--line);"><td colspan="2">Total Sales</td>${data.totalSales.map(v => `<td>${fmtCell(v)}</td>`).join('')}</tr>`;
+  html += `<tr style="font-weight:600;"><td colspan="2">Total Expense</td>${data.totalExpense.map(v => `<td>${fmtCell(v)}</td>`).join('')}</tr>`;
+  html += `<tr style="font-weight:600;"><td colspan="2">Total Net</td>${data.totalNet.map(v => `<td>${fmtCell(v, true)}</td>`).join('')}</tr>`;
+
+  document.getElementById('historicalTableBody').innerHTML = html;
+}
+
+// ---------------- Expense & Revenue Analysis tab ----------------
+function renderAnalysisTab(){
+  renderTopExpenseItems();
+  renderExpenseRankBars();
+  renderRevenueRanking();
+  renderAnalysisSuggestions();
+}
+
+function renderTopExpenseItems(){
+  const body = document.getElementById('topExpenseItemsBody');
+  if(!body) return;
+  const rows = computeExpenseBreakdown().slice().sort((a,b) => b.total - a.total).slice(0, 10);
+  if(rows.length === 0){ body.innerHTML = '<tr><td colspan="5" style="color:#7a756a;">No expenses logged yet.</td></tr>'; return; }
+  body.innerHTML = rows.map((r,i) => `
+    <tr>
+      <td><span class="rank-num">${i+1}</span></td>
+      <td>${escapeHtml(r.item)}</td>
+      <td>${escapeHtml(r.category)}</td>
+      <td>${escapeHtml(r.property)}</td>
+      <td>BDT ${Math.round(r.total).toLocaleString('en-IN')}</td>
+    </tr>
+  `).join('');
+}
+
+function renderExpenseRankBars(){
+  const el = document.getElementById('expenseRankBars');
+  if(!el) return;
+  const rows = computePropertySummary().slice().sort((a,b) => b.expense - a.expense).filter(r => r.expense > 0);
+  if(rows.length === 0){ el.innerHTML = '<div class="empty">No expenses logged yet.</div>'; return; }
+  const totalExpense = rows.reduce((s,r) => s+r.expense, 0);
+  const maxVal = Math.max(...rows.map(r => r.expense), 1);
+  el.innerHTML = rows.map((r,i) => `
+    <div class="bar-row">
+      <div class="bar-row-top"><span><span class="rank-num">${i+1}</span><b>${escapeHtml(r.property)}</b></span><span>BDT ${Math.round(r.expense).toLocaleString('en-IN')} (${(r.expense/totalExpense*100).toFixed(1)}%)</span></div>
+      <div class="bar-track"><div class="bar-fill-expense" style="width:${(r.expense/maxVal*100).toFixed(1)}%;opacity:1;"></div></div>
+    </div>
+  `).join('');
+}
+
+function renderRevenueRanking(){
+  const body = document.getElementById('revenueRankBody');
+  if(!body) return;
+  const rows = computePropertySummary().slice().sort((a,b) => b.revenue - a.revenue);
+  if(rows.length === 0){ body.innerHTML = '<tr><td colspan="5" style="color:#7a756a;">No data yet.</td></tr>'; return; }
+  body.innerHTML = rows.map((r,i) => {
+    const margin = r.sales > 0 ? (r.revenue / r.sales * 100) : 0;
+    return `<tr>
+      <td><span class="rank-num">${i+1}</span></td>
+      <td>${escapeHtml(r.property)}</td>
+      <td>BDT ${Math.round(r.sales).toLocaleString('en-IN')}</td>
+      <td style="color:${r.revenue>=0?'var(--green)':'var(--red)'};">BDT ${Math.round(r.revenue).toLocaleString('en-IN')}</td>
+      <td style="color:${margin>=0?'var(--green)':'var(--red)'};">${margin.toFixed(1)}%</td>
+    </tr>`;
+  }).join('');
+}
+
+function computeSuggestions(){
+  const propSummary = computePropertySummary();
+  const expenseBreakdown = computeExpenseBreakdown();
+  const gatewayTotals = computeGatewayTotals();
+  const targetEl = document.getElementById('expenseRatioTarget');
+  const ratioTarget = targetEl ? (parseFloat(targetEl.value) || 45) : 45;
+
+  const cards = [];
+  if(propSummary.length === 0 && expenseBreakdown.length === 0) return cards;
+
+  const sortedExpenseItems = [...expenseBreakdown].sort((a,b) => b.total - a.total);
+  if(sortedExpenseItems.length > 0){
+    const top = sortedExpenseItems[0];
+    cards.push({ type: 'warn', text: `${top.item} (${top.category}, ${top.property}) is your single biggest cost line at BDT ${Math.round(top.total).toLocaleString('en-IN')}. Consider negotiating a better rate or checking for a cheaper supplier.` });
+  }
+
+  const byExpense = [...propSummary].sort((a,b) => b.expense - a.expense);
+  if(byExpense.length > 0 && byExpense[0].expense > 0){
+    const p = byExpense[0];
+    cards.push({ type: 'warn', text: `${p.property} has the highest total expense (BDT ${Math.round(p.expense).toLocaleString('en-IN')}). Review its cost lines individually to find what's driving it.` });
+  }
+
+  propSummary.forEach(p => {
+    if(p.sales <= 0) return;
+    const ratio = (p.expense / p.sales) * 100;
+    if(ratio > ratioTarget){
+      cards.push({ type: 'warn', text: `${p.property}'s expense ratio is ${ratio.toFixed(1)}% of sales — above the ${ratioTarget}% target. Cost control needed here before scaling bookings.` });
+    }
+  });
+
+  propSummary.forEach(p => {
+    if(p.revenue < 0){
+      cards.push({ type: 'warn', text: `${p.property} is currently running at a loss (BDT ${Math.round(p.revenue).toLocaleString('en-IN')} net). Review pricing, discounting, or whether this property is worth continuing as-is.` });
+    }
+  });
+
+  const byRevenue = [...propSummary].sort((a,b) => b.revenue - a.revenue);
+  if(byRevenue.length > 0 && byRevenue[0].revenue > 0){
+    const p = byRevenue[0];
+    const margin = p.sales > 0 ? (p.revenue / p.sales * 100) : 0;
+    cards.push({ type: 'good', text: `${p.property} is the best performer — BDT ${Math.round(p.revenue).toLocaleString('en-IN')} net revenue (${margin.toFixed(1)}% margin). Worth prioritising for repeat guests and channel investment.` });
+  }
+
+  const totalGw = gatewayTotals.reduce((s,g) => s+g.total, 0);
+  if(totalGw > 0){
+    const topGw = [...gatewayTotals].sort((a,b) => b.total-a.total)[0];
+    const topPct = (topGw.total / totalGw * 100);
+    if(topPct > 50){
+      cards.push({ type: 'info', text: `${topGw.gateway} accounts for ${topPct.toFixed(1)}% of collections. Fine if it's a stable channel, but avoid over-reliance on a single gateway.` });
+    }
+    const cashEntry = gatewayTotals.find(g => g.gateway === 'Cash');
+    if(cashEntry && (cashEntry.total / totalGw * 100) > 10){
+      cards.push({ type: 'info', text: `Cash collections are ${(cashEntry.total/totalGw*100).toFixed(1)}% of total. Treat cash handling as an operational risk — reconcile daily and avoid unmanaged balances at month-end.` });
+    }
+  }
+
+  return cards;
+}
+
+function renderAnalysisSuggestions(){
+  const el = document.getElementById('analysisSuggestions');
+  if(!el) return;
+  const cards = computeSuggestions();
+  if(computePropertySummary().length === 0 && computeExpenseBreakdown().length === 0){
+    el.innerHTML = '<div class="empty">Not enough data yet — add or import bookings and expenses to see suggestions.</div>';
+    return;
+  }
+  if(cards.length === 0){
+    el.innerHTML = '<div class="empty">No red flags right now — expense ratios and revenue look healthy across properties.</div>';
+    return;
+  }
+  el.innerHTML = cards.map(c => `
+    <div class="insight-card ${c.type}">
+      <span class="insight-tag ${c.type}">${c.type === 'warn' ? 'Watch' : c.type === 'good' ? 'Good' : 'Note'}</span>
+      ${escapeHtml(c.text)}
+    </div>
+  `).join('');
+}
+
+// ---------------- Financial reports ----------------
+const FIXED_GATEWAYS = ['Cash', 'Saif Bkash', 'Bkash Merchant', 'Brac Bank', 'Payoneer'];
+function computeHandoverSummary(monthKey){
+  const mk = monthKey || currentMonth;
+  const totals = {};
+  handovers.filter(h => h.month === mk).forEach(h => {
+    const key = h.property || 'Unspecified';
+    totals[key] = (totals[key] || 0) + toBdtNumber(h.amount, 'BDT');
+  });
+  return Object.keys(totals).sort().map(p => ({ property: p, total: totals[p] }));
+}
+function renderHandoverReport(){
+  const body = document.getElementById('handoverReportBody');
+  if(!body) return;
+  const rows = computeHandoverSummary();
+  if(rows.length === 0){ body.innerHTML = '<tr><td colspan="2" style="color:#7a756a;">No handover recorded yet.</td></tr>'; return; }
+  const grandTotal = rows.reduce((s,r) => s+r.total, 0);
+  body.innerHTML = rows.map(r => `
+    <tr><td>${escapeHtml(r.property)}</td><td>BDT ${Math.round(r.total).toLocaleString('en-IN')}</td></tr>
+  `).join('') + `<tr style="font-weight:600;"><td>Total</td><td>BDT ${Math.round(grandTotal).toLocaleString('en-IN')}</td></tr>`;
+}
+function computeGatewayTotals(monthKey){
+  const mk = monthKey || currentMonth;
+  const totals = {};
+  FIXED_GATEWAYS.forEach(g => totals[g] = 0);
+  confirmed.filter(c => c.month === mk).forEach(c => {
+    if(FIXED_GATEWAYS.includes(c.gateway)){
+      totals[c.gateway] += toBdtNumber(c.amount, c.currency);
+    }
+  });
+  return FIXED_GATEWAYS.map(g => ({ gateway: g, total: totals[g] }));
+}
+function computePropertySummary(monthKey){
+  const mk = monthKey || currentMonth;
+  const sales = {};
+  confirmed.filter(c => c.month === mk).forEach(c => {
+    const key = c.property || 'Unspecified';
+    sales[key] = (sales[key] || 0) + toBdtNumber(c.amount, c.currency);
+  });
+  const expenseTotals = {};
+  expenses.filter(e => e.month === mk).forEach(e => {
+    const key = e.property || 'Unspecified';
+    expenseTotals[key] = (expenseTotals[key] || 0) + toBdtNumber(e.amount, e.currency);
+  });
+  const allProps = Array.from(new Set([...Object.keys(sales), ...Object.keys(expenseTotals)])).sort();
+  return allProps.map(p => {
+    const s = sales[p] || 0, e = expenseTotals[p] || 0;
+    return { property: p, sales: s, expense: e, revenue: s - e };
+  });
+}
+function computeExpenseBreakdown(monthKey){
+  const mk = monthKey || currentMonth;
+  const groups = {}; // property -> { itemLabel -> { category, total } }
+  expenses.filter(e => e.month === mk).forEach(e => {
+    const property = e.property || 'Unspecified';
+    const label = (e.item && e.item.trim()) || e.category || 'Other';
+    if(!groups[property]) groups[property] = {};
+    if(!groups[property][label]) groups[property][label] = { category: e.category || 'Other', total: 0 };
+    groups[property][label].total += toBdtNumber(e.amount, e.currency);
+  });
+  const rows = [];
+  Object.keys(groups).sort().forEach(property => {
+    Object.keys(groups[property]).sort().forEach(label => {
+      rows.push({ property, item: label, category: groups[property][label].category, total: groups[property][label].total });
+    });
+  });
+  return rows;
+}
+function renderFinancialReports(){
+  renderGatewayReport();
+  renderPropertyReport();
+  renderExpenseBreakdown();
+}
+function renderExpenseBreakdown(){
+  const body = document.getElementById('expenseBreakdownBody');
+  if(!body) return;
+  const rows = computeExpenseBreakdown();
+  if(rows.length === 0){ body.innerHTML = '<tr><td colspan="4" style="color:#7a756a;">No expenses logged yet.</td></tr>'; return; }
+  let lastProperty = null;
+  let html = '';
+  rows.forEach(r => {
+    const sameProp = r.property === lastProperty;
+    html += `<tr>
+      <td>${sameProp ? '' : escapeHtml(r.property)}</td>
+      <td>${escapeHtml(r.item)}</td>
+      <td>${escapeHtml(r.category)}</td>
+      <td>BDT ${Math.round(r.total).toLocaleString('en-IN')}</td>
+    </tr>`;
+    lastProperty = r.property;
+  });
+  body.innerHTML = html;
+}
+function renderGatewayReport(){
+  const body = document.getElementById('gatewayReportBody');
+  if(!body) return;
+  const entries = computeGatewayTotals();
+  const grandTotal = entries.reduce((s,e) => s+e.total, 0);
+  body.innerHTML = entries.map(e => `
+    <tr><td>${escapeHtml(e.gateway)}</td><td>BDT ${Math.round(e.total).toLocaleString('en-IN')}</td></tr>
+  `).join('') + `<tr style="font-weight:600;"><td>Total</td><td>BDT ${Math.round(grandTotal).toLocaleString('en-IN')}</td></tr>`;
+}
+function renderPropertyReport(){
+  const body = document.getElementById('propertyReportBody');
+  if(!body) return;
+  const rows = computePropertySummary();
+  if(rows.length === 0){ body.innerHTML = '<tr><td colspan="4" style="color:#7a756a;">No data yet.</td></tr>'; return; }
+
+  let totalSales = 0, totalExpense = 0;
+  let html = rows.map(r => {
+    totalSales += r.sales; totalExpense += r.expense;
+    return `<tr>
+      <td>${escapeHtml(r.property)}</td>
+      <td>BDT ${Math.round(r.sales).toLocaleString('en-IN')}</td>
+      <td>BDT ${Math.round(r.expense).toLocaleString('en-IN')}</td>
+      <td style="color:${r.revenue >= 0 ? 'var(--green)' : 'var(--red)'};">BDT ${Math.round(r.revenue).toLocaleString('en-IN')}</td>
+    </tr>`;
+  }).join('');
+  const totalRevenue = totalSales - totalExpense;
+  html += `<tr style="font-weight:600;">
+    <td>Total</td>
+    <td>BDT ${Math.round(totalSales).toLocaleString('en-IN')}</td>
+    <td>BDT ${Math.round(totalExpense).toLocaleString('en-IN')}</td>
+    <td style="color:${totalRevenue >= 0 ? 'var(--green)' : 'var(--red)'};">BDT ${Math.round(totalRevenue).toLocaleString('en-IN')}</td>
+  </tr>`;
+  body.innerHTML = html;
+}
+
+// ---------------- Export (owner-only): Excel, Word, PDF ----------------
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+
+function bookingRowsForExport(list){
+  return list.filter(c => c.month === currentMonth).map(c => ({
+    Property: c.property || '',
+    Platform: c.platform || '',
+    Guest: c.guest || '',
+    'Check-in': c.checkin || '',
+    'Check-out': c.checkout || '',
+    Nights: (nights(c.checkin, c.checkout) === '—') ? '' : nights(c.checkin, c.checkout),
+    'Amount Received': fmtReceived(c.amount, c.currency),
+    'BDT Equivalent': Math.round(toBdtNumber(c.amount, c.currency)),
+    Gateway: c.gateway || '',
+    Phone: c.contact || '',
+    Ref: c.ref || '',
+    'Added By': c.addedBy || '',
+    Notes: c.notes || ''
+  }));
+}
+function expenseRowsForExport(){
+  return expenses.filter(e => e.month === currentMonth).map(e => ({
+    Date: e.date || '',
+    Property: e.property || '',
+    Item: e.item || '',
+    Category: e.category || '',
+    'Amount': fmtReceived(e.amount, e.currency),
+    'BDT Equivalent': Math.round(toBdtNumber(e.amount, e.currency)),
+    Notes: e.notes || '',
+    'Added By': e.addedBy || ''
+  }));
+}
+
+function exportExcelReport(){
+  const statusEl = document.getElementById('exportStatus');
+  try{
+    if(typeof XLSX === 'undefined'){ statusEl.textContent = 'Excel export library did not load — check your internet connection and try again.'; return; }
+    const wb = XLSX.utils.book_new();
+    const ov = computeStatsOverview();
+    const targetEl = document.getElementById('expenseRatioTarget');
+    const ratioTarget = targetEl ? (parseFloat(targetEl.value) || 45) : 45;
+    const hist = computeHistoricalSeries();
+
+    // --- Reservations ---
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(bookingRowsForExport(confirmed)), 'Confirmed Bookings');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(bookingRowsForExport(pending)), 'Pending');
+
+    // --- Financials ---
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(computeGatewayTotals().map(g => ({ Gateway: g.gateway, 'Total BDT': Math.round(g.total) }))), 'Gateway Totals');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(computePropertySummary().map(p => ({ Property: p.property, 'Sales (BDT)': Math.round(p.sales), 'Expense (BDT)': Math.round(p.expense), 'Revenue (BDT)': Math.round(p.revenue) }))), 'Property Summary');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(computeExpenseBreakdown().map(r => ({ Property: r.property, Item: r.item, Category: r.category, 'Amount (BDT)': Math.round(r.total) }))), 'Expense Breakdown');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(expenseRowsForExport()), 'Expenses');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(computeHandoverSummary().map(h => ({ Property: h.property, 'Total Handover (BDT)': Math.round(h.total) }))), 'Handover (not sales)');
+
+    // --- Statistics ---
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{
+      'Total Sales (BDT)': Math.round(ov.totalSalesBDT), 'Total Expenses (BDT)': Math.round(ov.totalExpenseBDT),
+      'Net Profit (BDT)': Math.round(ov.netProfit), 'Net Margin (%)': ov.netMargin.toFixed(1),
+      'Expense Ratio (%)': ov.expenseRatio.toFixed(1), 'Bookings': ov.bookings, 'Cash Handover (BDT)': Math.round(ov.totalHandover)
+    }]), 'Statistics Overview');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(computePropertySummary().map(p => {
+      const ratio = p.sales > 0 ? (p.expense / p.sales * 100) : 0;
+      return { Property: p.property, 'Sales (BDT)': Math.round(p.sales), 'Expense (BDT)': Math.round(p.expense), 'Ratio (%)': ratio.toFixed(1), 'Target (%)': ratioTarget, 'Over Target': ratio > ratioTarget ? 'Yes' : 'No' };
+    })), 'Expense Ratio');
+    const gwTotal = computeGatewayTotals().reduce((s,g)=>s+g.total,0);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(computeGatewayTotals().map(g => ({ Gateway: g.gateway, '% of Collections': gwTotal>0 ? (g.total/gwTotal*100).toFixed(1) : '0.0', 'Total (BDT)': Math.round(g.total) }))), 'Collection Mix');
+    const histRows = [];
+    hist.properties.forEach(p => {
+      const s = hist.series[p];
+      histRows.push({ Property: p, Metric: 'Sales', ...Object.fromEntries(hist.months.map((m,i) => [m, s.sales[i]===null?'':Math.round(s.sales[i])])) });
+      histRows.push({ Property: p, Metric: 'Expense', ...Object.fromEntries(hist.months.map((m,i) => [m, s.expense[i]===null?'':Math.round(s.expense[i])])) });
+      histRows.push({ Property: p, Metric: 'Net', ...Object.fromEntries(hist.months.map((m,i) => [m, s.revenue[i]===null?'':Math.round(s.revenue[i])])) });
+    });
+    histRows.push({ Property: 'Total', Metric: 'Sales', ...Object.fromEntries(hist.months.map((m,i) => [m, Math.round(hist.totalSales[i])])) });
+    histRows.push({ Property: 'Total', Metric: 'Expense', ...Object.fromEntries(hist.months.map((m,i) => [m, Math.round(hist.totalExpense[i])])) });
+    histRows.push({ Property: 'Total', Metric: 'Net', ...Object.fromEntries(hist.months.map((m,i) => [m, Math.round(hist.totalNet[i])])) });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(histRows), 'Historical Analysis');
+
+    // --- Expense & Revenue Analysis ---
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+      computeExpenseBreakdown().slice().sort((a,b)=>b.total-a.total).slice(0,10)
+        .map((r,i) => ({ Rank: i+1, Item: r.item, Category: r.category, Property: r.property, 'Amount (BDT)': Math.round(r.total) }))
+    ), 'Top Expense Items');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+      computePropertySummary().slice().sort((a,b)=>b.revenue-a.revenue)
+        .map((r,i) => ({ Rank: i+1, Property: r.property, 'Sales (BDT)': Math.round(r.sales), 'Revenue (BDT)': Math.round(r.revenue), 'Margin (%)': r.sales>0 ? (r.revenue/r.sales*100).toFixed(1) : '0.0' }))
+    ), 'Revenue Ranking');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+      computeSuggestions().map((c,i) => ({ '#': i+1, Type: c.type === 'warn' ? 'Watch' : c.type === 'good' ? 'Good' : 'Note', Suggestion: c.text }))
+    ), 'Suggestions');
+
+    XLSX.writeFile(wb, `Greyroom_Report_${currentMonth.replace(/[^a-zA-Z0-9]/g,'')}_${todayStr()}.xlsx`);
+    statusEl.textContent = 'Excel report downloaded.';
+    logActivity('exported the full report as Excel');
+  }catch(e){
+    console.error('Excel export failed', e);
+    statusEl.textContent = 'Excel export failed: ' + (e && e.message ? e.message : 'unknown error');
+  }
+}
+
+function tableHtml(headers, rows){
+  const thead = '<tr>' + headers.map(h => `<th style="border:1px solid #999;padding:4px 8px;background:#eee;text-align:left;">${escapeHtml(h)}</th>`).join('') + '</tr>';
+  const tbody = rows.map(r => '<tr>' + r.map(c => `<td style="border:1px solid #ccc;padding:4px 8px;">${escapeHtml(c)}</td>`).join('') + '</tr>').join('');
+  return `<table style="border-collapse:collapse;width:100%;font-size:12px;margin-bottom:18px;">${thead}${tbody}</table>`;
+}
+
+function buildReportSections(){
+  const gw = computeGatewayTotals();
+  const props = computePropertySummary();
+  const breakdown = computeExpenseBreakdown();
+  const handoverSummary = computeHandoverSummary();
+  const ov = computeStatsOverview();
+  const targetEl = document.getElementById('expenseRatioTarget');
+  const ratioTarget = targetEl ? (parseFloat(targetEl.value) || 45) : 45;
+  const gwTotal = gw.reduce((s,g)=>s+g.total,0);
+  const hist = computeHistoricalSeries();
+  const suggestions = computeSuggestions();
+  const topExpenseItems = computeExpenseBreakdown().slice().sort((a,b)=>b.total-a.total).slice(0,10);
+  const revenueRanking = computePropertySummary().slice().sort((a,b)=>b.revenue-a.revenue);
+
+  const histTableRows = [];
+  hist.properties.forEach(p => {
+    const s = hist.series[p];
+    histTableRows.push([p, 'Sales', ...s.sales.map(v => v===null?'—':'BDT '+Math.round(v).toLocaleString('en-IN'))]);
+    histTableRows.push(['', 'Expense', ...s.expense.map(v => v===null?'—':'BDT '+Math.round(v).toLocaleString('en-IN'))]);
+    histTableRows.push(['', 'Net', ...s.revenue.map(v => v===null?'—':'BDT '+Math.round(v).toLocaleString('en-IN'))]);
+  });
+  histTableRows.push(['Total','Sales', ...hist.totalSales.map(v => 'BDT '+Math.round(v).toLocaleString('en-IN'))]);
+  histTableRows.push(['','Expense', ...hist.totalExpense.map(v => 'BDT '+Math.round(v).toLocaleString('en-IN'))]);
+  histTableRows.push(['','Net', ...hist.totalNet.map(v => 'BDT '+Math.round(v).toLocaleString('en-IN'))]);
+
+  return {
+    confirmedTable: tableHtml(
+      ['Property','Platform','Guest','Check-in','Check-out','Nights','Amount Received','BDT Equivalent','Gateway','Phone','Ref','Added By'],
+      confirmed.filter(c => c.month === currentMonth).map(c => [c.property||'', c.platform||'', c.guest||'', fmtDate(c.checkin), fmtDate(c.checkout), nights(c.checkin,c.checkout), fmtReceived(c.amount,c.currency), fmtBdtEquivalent(c.amount,c.currency), c.gateway||'', c.contact||'', c.ref||'', c.addedBy||''])
+    ),
+    pendingTable: tableHtml(
+      ['Property','Platform','Guest','Check-in','Check-out','Amount','Gateway','Phone','Added By'],
+      pending.filter(p => p.month === currentMonth).map(p => [p.property||'', p.platform||'', p.guest||'', fmtDate(p.checkin), fmtDate(p.checkout), fmtReceived(p.amount,p.currency), p.gateway||'', p.contact||'', p.addedBy||''])
+    ),
+    gatewayTable: tableHtml(['Gateway','Total Received (BDT)'], gw.map(g => [g.gateway, 'BDT ' + Math.round(g.total).toLocaleString('en-IN')])),
+    handoverTable: tableHtml(['Property','Total Handover (BDT)'], handoverSummary.map(h => [h.property, 'BDT ' + Math.round(h.total).toLocaleString('en-IN')])),
+    propertyTable: tableHtml(['Property','Sales (BDT)','Expense (BDT)','Revenue (BDT)'], props.map(p => [p.property, Math.round(p.sales).toLocaleString('en-IN'), Math.round(p.expense).toLocaleString('en-IN'), Math.round(p.revenue).toLocaleString('en-IN')])),
+    breakdownTable: tableHtml(['Property','Item','Category','Amount (BDT)'], breakdown.map(r => [r.property, r.item, r.category, Math.round(r.total).toLocaleString('en-IN')])),
+    expenseTable: tableHtml(['Date','Property','Item','Category','Amount','BDT Equivalent','Added By'], expenses.filter(e => e.month === currentMonth).map(e => [e.date ? fmtDate(e.date) : '', e.property||'', e.item||'', e.category||'', fmtReceived(e.amount,e.currency), fmtBdtEquivalent(e.amount,e.currency), e.addedBy||''])),
+
+    overviewTable: tableHtml(['Metric','Value'], [
+      ['Total Sales', 'BDT ' + Math.round(ov.totalSalesBDT).toLocaleString('en-IN')],
+      ['Total Expenses', 'BDT ' + Math.round(ov.totalExpenseBDT).toLocaleString('en-IN') + ` (${ov.expenseRatio.toFixed(1)}% of sales)`],
+      ['Net Profit', 'BDT ' + Math.round(ov.netProfit).toLocaleString('en-IN') + ` (${ov.netMargin.toFixed(1)}% margin)`],
+      ['Bookings', String(ov.bookings)],
+      ['Cash Handover (not sales)', 'BDT ' + Math.round(ov.totalHandover).toLocaleString('en-IN')]
+    ]),
+    ratioTable: tableHtml(['Property','Sales (BDT)','Expense (BDT)','Ratio','Vs Target'], props.map(p => {
+      const ratio = p.sales > 0 ? (p.expense/p.sales*100) : 0;
+      return [p.property, Math.round(p.sales).toLocaleString('en-IN'), Math.round(p.expense).toLocaleString('en-IN'), ratio.toFixed(1)+'%', ratio > ratioTarget ? `Over ${ratioTarget}% target` : 'Within target'];
+    })),
+    collectionMixTable: tableHtml(['Gateway','% of Collections','Total (BDT)'], gw.map(g => [g.gateway, gwTotal>0 ? (g.total/gwTotal*100).toFixed(1)+'%' : '0.0%', 'BDT '+Math.round(g.total).toLocaleString('en-IN')])),
+    historicalTable: tableHtml(['Property','Metric', ...hist.months], histTableRows),
+    topExpenseItemsTable: tableHtml(['#','Item','Category','Property','Amount (BDT)'], topExpenseItems.map((r,i) => [i+1, r.item, r.category, r.property, 'BDT '+Math.round(r.total).toLocaleString('en-IN')])),
+    revenueRankingTable: tableHtml(['#','Property','Sales','Revenue','Margin'], revenueRanking.map((r,i) => {
+      const margin = r.sales>0 ? (r.revenue/r.sales*100) : 0;
+      return [i+1, r.property, 'BDT '+Math.round(r.sales).toLocaleString('en-IN'), 'BDT '+Math.round(r.revenue).toLocaleString('en-IN'), margin.toFixed(1)+'%'];
+    })),
+    suggestionsHtml: suggestions.length === 0
+      ? '<p>No red flags right now.</p>'
+      : '<ul>' + suggestions.map(c => `<li><b>[${c.type === 'warn' ? 'Watch' : c.type === 'good' ? 'Good' : 'Note'}]</b> ${escapeHtml(c.text)}</li>`).join('') + '</ul>'
+  };
+}
+
+function exportWordReport(){
+  const statusEl = document.getElementById('exportStatus');
+  try{
+    const s = buildReportSections();
+    const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+    <head><meta charset='utf-8'><title>Greyroom Report</title></head>
+    <body style="font-family:Calibri,Arial,sans-serif;">
+      <h1>Greyroom Reservations &amp; Financial Report — ${escapeHtml(currentMonth)}</h1>
+      <p>Generated ${escapeHtml(new Date().toLocaleString('en-GB'))}</p>
+      <h1>Reservations</h1>
+      <h2>Confirmed Bookings</h2>${s.confirmedTable}
+      <h2>Pending Bookings</h2>${s.pendingTable}
+      <h1>Financials</h1>
+      <h2>Received by Gateway</h2>${s.gatewayTable}
+      <h2>Cash Handover (not sales)</h2>${s.handoverTable}
+      <h2>Property-wise Sales, Expense &amp; Revenue</h2>${s.propertyTable}
+      <h2>Property-wise Expense Breakdown</h2>${s.breakdownTable}
+      <h2>Expense Log</h2>${s.expenseTable}
+      <h1>Statistics</h1>
+      <h2>Executive Overview</h2>${s.overviewTable}
+      <h2>Cost-control / Expense Ratio</h2>${s.ratioTable}
+      <h2>Collection Mix</h2>${s.collectionMixTable}
+      <h2>Historical Analysis</h2>${s.historicalTable}
+      <h1>Expense &amp; Revenue Analysis</h1>
+      <h2>Top Expense Items</h2>${s.topExpenseItemsTable}
+      <h2>Revenue Ranking</h2>${s.revenueRankingTable}
+      <h2>Suggestions &amp; Action Points</h2>${s.suggestionsHtml}
+    </body></html>`;
+    const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `Greyroom_Report_${currentMonth.replace(/[^a-zA-Z0-9]/g,'')}_${todayStr()}.doc`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    statusEl.textContent = 'Word report downloaded (opens in Microsoft Word).';
+    logActivity('exported the full report as Word');
+  }catch(e){
+    console.error('Word export failed', e);
+    statusEl.textContent = 'Word export failed: ' + (e && e.message ? e.message : 'unknown error');
+  }
+}
+
+function exportPdfReport(){
+  const statusEl = document.getElementById('exportStatus');
+  try{
+    if(typeof window.jspdf === 'undefined'){ statusEl.textContent = 'PDF export library did not load — check your internet connection and try again.'; return; }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'landscape' });
+    let y = 15;
+
+    const addPageTitle = (title) => {
+      doc.setFontSize(16);
+      doc.text(title, 14, y);
+      doc.setFontSize(9);
+      doc.text('Generated ' + new Date().toLocaleString('en-GB'), 14, y + 6);
+      y += 12;
+    };
+    const addSection = (title, head, body) => {
+      if(y > 170){ doc.addPage(); y = 15; }
+      doc.setFontSize(12);
+      doc.text(title, 14, y);
+      doc.autoTable({ startY: y + 3, head: [head], body, styles: { fontSize: 7 }, margin: { left: 14, right: 14 } });
+      y = (doc.lastAutoTable ? doc.lastAutoTable.finalY : y + 20) + 10;
+    };
+
+    // ---- Page 1+: Reservations ----
+    addPageTitle(`Greyroom Reservations & Financial Report — ${currentMonth}`);
+    addSection('Confirmed Bookings',
+      ['Property','Platform','Guest','Check-in','Check-out','Nights','Amount','BDT Equiv','Gateway','Phone'],
+      confirmed.filter(c => c.month === currentMonth).map(c => [c.property||'', c.platform||'', c.guest||'', fmtDate(c.checkin), fmtDate(c.checkout), nights(c.checkin,c.checkout), fmtReceived(c.amount,c.currency), fmtBdtEquivalent(c.amount,c.currency), c.gateway||'', c.contact||'']));
+
+    addSection('Pending Bookings',
+      ['Property','Platform','Guest','Check-in','Check-out','Amount','Gateway','Phone'],
+      pending.filter(p => p.month === currentMonth).map(p => [p.property||'', p.platform||'', p.guest||'', fmtDate(p.checkin), fmtDate(p.checkout), fmtReceived(p.amount,p.currency), p.gateway||'', p.contact||'']));
+
+    // ---- Force a fresh page for Financials so it can never get lost after a large bookings table ----
+    doc.addPage();
+    y = 15;
+    doc.setFontSize(16);
+    doc.text('Financial Summary', 14, y);
+    y += 12;
+
+    addSection('Received by Gateway', ['Gateway','Total BDT'],
+      computeGatewayTotals().map(g => [g.gateway, 'BDT ' + Math.round(g.total).toLocaleString('en-IN')]));
+
+    addSection('Cash Handover (not sales)', ['Property','Total Handover (BDT)'],
+      computeHandoverSummary().map(h => [h.property, 'BDT ' + Math.round(h.total).toLocaleString('en-IN')]));
+
+    addSection('Property-wise Sales, Expense & Revenue', ['Property','Sales (BDT)','Expense (BDT)','Revenue (BDT)'],
+      computePropertySummary().map(p => [p.property, Math.round(p.sales).toLocaleString('en-IN'), Math.round(p.expense).toLocaleString('en-IN'), Math.round(p.revenue).toLocaleString('en-IN')]));
+
+    addSection('Property-wise Expense Breakdown', ['Property','Item','Category','Amount (BDT)'],
+      computeExpenseBreakdown().map(r => [r.property, r.item, r.category, Math.round(r.total).toLocaleString('en-IN')]));
+
+    addSection('Expense Log', ['Date','Property','Item','Category','Amount','BDT Equiv'],
+      expenses.filter(e => e.month === currentMonth).map(e => [e.date ? fmtDate(e.date) : '', e.property||'', e.item||'', e.category||'', fmtReceived(e.amount,e.currency), fmtBdtEquivalent(e.amount,e.currency)]));
+
+    // ---- Fresh page for Statistics ----
+    doc.addPage();
+    y = 15;
+    doc.setFontSize(16);
+    doc.text('Statistics', 14, y);
+    y += 12;
+
+    const ov = computeStatsOverview();
+    const targetElPdf = document.getElementById('expenseRatioTarget');
+    const ratioTargetPdf = targetElPdf ? (parseFloat(targetElPdf.value) || 45) : 45;
+
+    addSection('Executive Overview', ['Metric','Value'], [
+      ['Total Sales', 'BDT ' + Math.round(ov.totalSalesBDT).toLocaleString('en-IN')],
+      ['Total Expenses', 'BDT ' + Math.round(ov.totalExpenseBDT).toLocaleString('en-IN') + ` (${ov.expenseRatio.toFixed(1)}% of sales)`],
+      ['Net Profit', 'BDT ' + Math.round(ov.netProfit).toLocaleString('en-IN') + ` (${ov.netMargin.toFixed(1)}% margin)`],
+      ['Bookings', String(ov.bookings)],
+      ['Cash Handover (not sales)', 'BDT ' + Math.round(ov.totalHandover).toLocaleString('en-IN')]
+    ]);
+
+    addSection('Cost-control / Expense Ratio', ['Property','Sales (BDT)','Expense (BDT)','Ratio','Vs Target'],
+      computePropertySummary().map(p => {
+        const ratio = p.sales > 0 ? (p.expense/p.sales*100) : 0;
+        return [p.property, Math.round(p.sales).toLocaleString('en-IN'), Math.round(p.expense).toLocaleString('en-IN'), ratio.toFixed(1)+'%', ratio > ratioTargetPdf ? `Over ${ratioTargetPdf}%` : 'Within target'];
+      }));
+
+    const gwForPdf = computeGatewayTotals();
+    const gwTotalPdf = gwForPdf.reduce((s,g)=>s+g.total,0);
+    addSection('Collection Mix', ['Gateway','% of Collections','Total (BDT)'],
+      gwForPdf.map(g => [g.gateway, gwTotalPdf>0 ? (g.total/gwTotalPdf*100).toFixed(1)+'%' : '0.0%', 'BDT '+Math.round(g.total).toLocaleString('en-IN')]));
+
+    const histPdf = computeHistoricalSeries();
+    const histRowsPdf = [];
+    histPdf.properties.forEach(p => {
+      const s = histPdf.series[p];
+      histRowsPdf.push([p, 'Sales', ...s.sales.map(v => v===null?'—':'BDT '+Math.round(v).toLocaleString('en-IN'))]);
+      histRowsPdf.push(['', 'Expense', ...s.expense.map(v => v===null?'—':'BDT '+Math.round(v).toLocaleString('en-IN'))]);
+      histRowsPdf.push(['', 'Net', ...s.revenue.map(v => v===null?'—':'BDT '+Math.round(v).toLocaleString('en-IN'))]);
+    });
+    histRowsPdf.push(['Total','Sales', ...histPdf.totalSales.map(v => 'BDT '+Math.round(v).toLocaleString('en-IN'))]);
+    histRowsPdf.push(['','Expense', ...histPdf.totalExpense.map(v => 'BDT '+Math.round(v).toLocaleString('en-IN'))]);
+    histRowsPdf.push(['','Net', ...histPdf.totalNet.map(v => 'BDT '+Math.round(v).toLocaleString('en-IN'))]);
+    addSection('Historical Analysis', ['Property','Metric', ...histPdf.months], histRowsPdf);
+
+    // ---- Fresh page for Expense & Revenue Analysis ----
+    doc.addPage();
+    y = 15;
+    doc.setFontSize(16);
+    doc.text('Expense & Revenue Analysis', 14, y);
+    y += 12;
+
+    addSection('Top Expense Items', ['#','Item','Category','Property','Amount (BDT)'],
+      computeExpenseBreakdown().slice().sort((a,b)=>b.total-a.total).slice(0,10)
+        .map((r,i) => [i+1, r.item, r.category, r.property, 'BDT '+Math.round(r.total).toLocaleString('en-IN')]));
+
+    addSection('Revenue Ranking', ['#','Property','Sales','Revenue','Margin'],
+      computePropertySummary().slice().sort((a,b)=>b.revenue-a.revenue).map((r,i) => {
+        const margin = r.sales>0 ? (r.revenue/r.sales*100) : 0;
+        return [i+1, r.property, 'BDT '+Math.round(r.sales).toLocaleString('en-IN'), 'BDT '+Math.round(r.revenue).toLocaleString('en-IN'), margin.toFixed(1)+'%'];
+      }));
+
+    if(y > 170){ doc.addPage(); y = 15; }
+    doc.setFontSize(12);
+    doc.text('Suggestions & Action Points', 14, y);
+    y += 7;
+    doc.setFontSize(9);
+    const suggestionsPdf = computeSuggestions();
+    if(suggestionsPdf.length === 0){
+      doc.text('No red flags right now.', 14, y);
+      y += 6;
+    } else {
+      suggestionsPdf.forEach(c => {
+        const tag = c.type === 'warn' ? '[Watch] ' : c.type === 'good' ? '[Good] ' : '[Note] ';
+        const lines = doc.splitTextToSize(tag + c.text, 267);
+        if(y + lines.length * 5 > 195){ doc.addPage(); y = 15; }
+        doc.text(lines, 14, y);
+        y += lines.length * 5 + 3;
+      });
+    }
+
+    doc.save(`Greyroom_Report_${currentMonth.replace(/[^a-zA-Z0-9]/g,'')}_${todayStr()}.pdf`);
+    statusEl.textContent = `PDF report downloaded (${doc.internal.getNumberOfPages()} pages).`;
+    logActivity('exported the full report as PDF');
+  }catch(e){
+    console.error('PDF export failed', e);
+    statusEl.textContent = 'PDF export failed: ' + (e && e.message ? e.message : 'unknown error');
+  }
+}
+
+function renderPeople(){
+  const el = document.getElementById('peopleList');
+  if(accessList.length === 0){ el.innerHTML = '<div class="empty">No one has access yet.</div>'; return; }
+  el.innerHTML = accessList.map(p => `
+    <div class="people-row">
+      <div><span class="people-name">${escapeHtml(p.name)}</span> <span class="role-pill">${escapeHtml(p.role)}</span></div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="people-code">${escapeHtml(p.code)}</span>
+        <button class="people-remove" onclick="removePerson('${p.id}')">Remove</button>
+      </div>
+    </div>
+  `).join('');
+}
+async function addPerson(){
+  if(session.role !== 'admin'){ showToast('Only admins can grant access'); return; }
+  const name = document.getElementById('np-name').value.trim();
+  const code = document.getElementById('np-code').value.trim().toUpperCase();
+  const role = document.getElementById('np-role').value;
+  if(!name || !code){ showToast('Name and access code are required'); return; }
+  if(accessList.some(p => p.code.toUpperCase() === code)){ showToast('That access code is already in use'); return; }
+  accessList.push({ id: uid(), name, code, role, addedAt: new Date().toISOString() });
+  await saveAccessList();
+  document.getElementById('np-name').value = '';
+  document.getElementById('np-code').value = '';
+  renderPeople();
+  showToast(`Access code created for ${name}`);
+  logActivity(`granted ${role} access to ${name}`);
+}
+async function removePerson(id){
+  if(session.role !== 'admin'){ showToast('Only admins can remove access'); return; }
+  const idx = accessList.findIndex(p => p.id === id);
+  if(idx === -1) return;
+  const person = accessList[idx];
+  if(person.code === session.code){ showToast("You can't remove your own access code while signed in"); return; }
+  accessList.splice(idx,1);
+  await saveAccessList();
+  renderPeople();
+  showToast(`Removed access for ${person.name}`);
+  logActivity(`revoked access for ${person.name}`);
+}
+function renderActivityLog(){
+  const el = document.getElementById('activityLog');
+  if(activityLog.length === 0){ el.innerHTML = '<div class="empty">No activity yet.</div>'; return; }
+  el.innerHTML = activityLog.slice(0,50).map(a => `
+    <div class="log-line"><b>${escapeHtml(a.who)}</b> ${escapeHtml(a.action)} <span class="log-time">— ${new Date(a.ts).toLocaleString('en-GB')}</span></div>
+  `).join('');
+}
+
+// ---------------- Danger zone ----------------
+function showClearConfirm(){
+  const scoped = {
+    pending: pending.filter(p => p.month === currentMonth).length,
+    confirmed: confirmed.filter(c => c.month === currentMonth).length,
+    expenses: expenses.filter(e => e.month === currentMonth).length,
+    handovers: handovers.filter(h => h.month === currentMonth).length
+  };
+  document.getElementById('clearCounts').textContent =
+    `${scoped.pending} pending, ${scoped.confirmed} confirmed, ${scoped.expenses} expense and ${scoped.handovers} handover entries for ${currentMonth}`;
+  document.getElementById('clearConfirmRow').style.display = 'block';
+  document.getElementById('clearDataBtn').style.display = 'none';
+}
+function hideClearConfirm(){
+  document.getElementById('clearConfirmRow').style.display = 'none';
+  document.getElementById('clearDataBtn').style.display = 'inline-block';
+}
+// ---------------- Backup & restore ----------------
+function downloadBackup(){
+  const statusEl = document.getElementById('backupStatus');
+  try{
+    const payload = {
+      greyroomBackupVersion: 1,
+      savedAt: new Date().toISOString(),
+      savedBy: session ? session.name : '',
+      months, currentMonth, properties,
+      confirmed, pending, expenses, handovers,
+      historicalAnalysis, accessList
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Greyroom_Backup_${todayStr()}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    statusEl.textContent = `Backup downloaded — ${confirmed.length} confirmed, ${pending.length} pending, ${expenses.length} expenses, ${handovers.length} handovers across ${months.length} month(s).`;
+    logActivity('downloaded a full backup file');
+  }catch(e){
+    console.error('Backup failed', e);
+    statusEl.textContent = 'Backup failed: ' + (e && e.message ? e.message : 'unknown error');
+  }
+}
+
+async function handleRestore(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('backupStatus');
+  statusEl.textContent = 'Reading backup file…';
+  try{
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if(!data || !data.greyroomBackupVersion){
+      statusEl.textContent = 'That does not look like a Greyroom backup file.';
+      return;
+    }
+
+    // Merge by id — never delete anything already present.
+    const mergeById = (current, incoming) => {
+      const seen = new Set(current.map(x => x.id).filter(Boolean));
+      const extra = (incoming || []).filter(x => x && x.id && !seen.has(x.id));
+      return { merged: [...current, ...extra], added: extra.length };
+    };
+
+    const c = mergeById(confirmed, data.confirmed);   confirmed = c.merged;
+    const p = mergeById(pending, data.pending);       pending   = p.merged;
+    const e2 = mergeById(expenses, data.expenses);    expenses  = e2.merged;
+    const h = mergeById(handovers, data.handovers);   handovers = h.merged;
+
+    const newMonths = (data.months || []).map(normalizeMonthLabel).filter(m => m && !months.includes(m));
+    if(newMonths.length) months = [...months, ...newMonths];
+
+    const newProps = (data.properties || []).filter(x => x && !properties.includes(x));
+    if(newProps.length) properties = [...properties, ...newProps];
+
+    if(data.historicalAnalysis && (data.historicalAnalysis.months || []).length && !(historicalAnalysis.months || []).length){
+      historicalAnalysis = data.historicalAnalysis;
+      await saveHistoricalAnalysis();
+    }
+
+    await saveConfirmed(); await savePending(); await saveExpenses(); await saveHandovers();
+    if(newMonths.length) await saveMonths();
+    if(newProps.length) await saveProperties();
+
+    renderProperties(); renderMonthBar(); refreshAllTabsForMonth();
+
+    statusEl.textContent = `Restored: ${c.added} confirmed, ${p.added} pending, ${e2.added} expense(s), ${h.added} handover(s), ${newMonths.length} month(s), ${newProps.length} propert${newProps.length===1?'y':'ies'} added. Nothing was deleted.`;
+    showToast('Backup restored');
+    logActivity(`restored from a backup file (${c.added} confirmed, ${e2.added} expenses added)`);
+  }catch(err){
+    console.error('Restore failed', err);
+    statusEl.textContent = 'Restore failed: ' + (err && err.message ? err.message : 'unknown error');
+  } finally {
+    event.target.value = '';
+  }
+}
+
+// ---------------- Recover local data ----------------
+async function migrateOldEntries(key, currentArr){
+  if(typeof window.storage === 'undefined') return [];
+  const seen = new Set(currentArr.map(x => x.id).filter(Boolean));
+  const extra = [];
+  for(const shared of [true, false]){
+    try{
+      const res = await window.storage.get(key, shared);
+      const arr = res && res.value ? JSON.parse(res.value) : [];
+      arr.forEach(item => {
+        if(item && item.id && !seen.has(item.id)){
+          seen.add(item.id);
+          extra.push(item);
+        }
+      });
+    }catch(e){ /* nothing there, or old storage unavailable — fine */ }
+  }
+  return extra;
+}
+
+async function recoverArrayFromPersonal(key, currentArr){
+  return migrateOldEntries(key, currentArr);
+}
+
+async function recoverLocalData(silent){
+  const statusEl = document.getElementById('recoverStatus');
+  if(statusEl && !silent) statusEl.textContent = 'Checking Claude\'s old storage for anything not yet in Google Sheets…';
+
+  if(typeof window.storage === 'undefined'){
+    if(statusEl && !silent) statusEl.textContent = 'Old storage isn\'t available here — nothing to migrate.';
+    return;
+  }
+
+  try{
+    const results = {};
+
+    let extra = await migrateOldEntries('greyroom:confirmed', confirmed);
+    if(extra.length){ confirmed = [...confirmed, ...extra]; await saveConfirmed(); }
+    results.confirmed = extra.length;
+
+    extra = await migrateOldEntries('greyroom:pending', pending);
+    if(extra.length){ pending = [...pending, ...extra]; await savePending(); }
+    results.pending = extra.length;
+
+    extra = await migrateOldEntries('greyroom:expenses', expenses);
+    if(extra.length){ expenses = [...expenses, ...extra]; await saveExpenses(); }
+    results.expenses = extra.length;
+
+    extra = await migrateOldEntries('greyroom:handovers', handovers);
+    if(extra.length){ handovers = [...handovers, ...extra]; await saveHandovers(); }
+    results.handovers = extra.length;
+
+    // Months is a plain string array — merge by normalized value instead of id
+    const newMonths = [];
+    for(const shared of [true, false]){
+      try{
+        const res = await window.storage.get('greyroom:months', shared);
+        const arr = res && res.value ? JSON.parse(res.value) : [];
+        arr.map(normalizeMonthLabel).forEach(m => { if(m && !months.includes(m) && !newMonths.includes(m)) newMonths.push(m); });
+      }catch(e){ /* nothing there */ }
+    }
+    if(newMonths.length > 0){
+      months = [...months, ...newMonths];
+      await saveMonths();
+    }
+    results.months = newMonths.length;
+
+    const totalRecovered = results.confirmed + results.pending + results.expenses + results.handovers + results.months;
+
+    if(totalRecovered === 0){
+      if(statusEl && !silent) statusEl.textContent = 'Nothing found in old storage — Google Sheets already has everything.';
+    } else {
+      const parts = [];
+      if(results.confirmed) parts.push(`${results.confirmed} confirmed booking(s)`);
+      if(results.pending) parts.push(`${results.pending} pending booking(s)`);
+      if(results.expenses) parts.push(`${results.expenses} expense(s)`);
+      if(results.handovers) parts.push(`${results.handovers} handover(s)`);
+      if(results.months) parts.push(`${results.months} month(s): ${newMonths.join(', ')}`);
+      if(statusEl) statusEl.textContent = `Migrated from old storage into Google Sheets: ${parts.join(', ')}.`;
+      showToast(`Migrated old data into Google Sheets: ${parts.join(', ')}`);
+      logActivity(`migrated data from Claude's old storage into Google Sheets: ${parts.join(', ')}`);
+      renderMonthBar();
+      refreshAllTabsForMonth();
+    }
+  }catch(e){
+    console.error('Migration failed', e);
+    if(statusEl) statusEl.textContent = 'Migration failed: ' + (e && e.message ? e.message : 'unknown error');
+  }
+}
+
+async function clearAllData(){
+  if(session.role !== 'admin'){ showToast('Only admins can clear data'); return; }
+
+  const counts = {
+    pending: pending.filter(p => p.month === currentMonth).length,
+    confirmed: confirmed.filter(c => c.month === currentMonth).length,
+    expenses: expenses.filter(e => e.month === currentMonth).length,
+    handovers: handovers.filter(h => h.month === currentMonth).length
+  };
+  pending = pending.filter(p => p.month !== currentMonth);
+  confirmed = confirmed.filter(c => c.month !== currentMonth);
+  expenses = expenses.filter(e => e.month !== currentMonth);
+  handovers = handovers.filter(h => h.month !== currentMonth);
+  await savePending();
+  await saveConfirmed();
+  await saveExpenses();
+  await saveHandovers();
+
+  renderPending();
+  renderConfirmed();
+  renderExpenseLog();
+  renderRequisitionList();
+  renderFinancialReports();
+  renderHandoverReport();
+  updateStats();
+  hideClearConfirm();
+  showToast(`All ${currentMonth} data cleared`);
+  logActivity(`cleared all ${currentMonth} data (${counts.pending} pending, ${counts.confirmed} confirmed, ${counts.expenses} expenses, ${counts.handovers} handovers removed)`);
+}
+
+// ---------------- Recalculate ----------------
+function bookingDedupeKey(b){
+  return [b.month, b.property, b.platform, b.guest, b.checkin, b.checkout, b.amount, b.currency, b.gateway, b.ref]
+    .map(v => String(v === null || v === undefined ? '' : v).trim().toLowerCase()).join('|');
+}
+function expenseDedupeKey(e){
+  return [e.month, e.property, e.item || e.category, e.category, e.amount, e.currency, e.date]
+    .map(v => String(v === null || v === undefined ? '' : v).trim().toLowerCase()).join('|');
+}
+function dedupeArray(arr, keyFn){
+  const seen = new Set();
+  const kept = [];
+  let removed = 0;
+  arr.forEach(item => {
+    const key = keyFn(item);
+    if(seen.has(key)){ removed++; }
+    else { seen.add(key); kept.push(item); }
+  });
+  return { kept, removed };
+}
+function handoverDedupeKey(h){
+  return [h.month, h.property, h.guest, h.amount, h.date]
+    .map(v => String(v === null || v === undefined ? '' : v).trim().toLowerCase()).join('|');
+}
+
+async function recalculateData(){
+  if(session.role !== 'admin'){ showToast('Only admins can recalculate'); return; }
+  const statusEl = document.getElementById('recalcStatus');
+  statusEl.textContent = 'Recalculating…';
+
+  // Fix any amount that isn't a valid number
+  let fixedAmounts = 0;
+  const fixAmounts = (arr) => {
+    arr.forEach(item => {
+      if(item.amount !== null && item.amount !== undefined && item.amount !== ''){
+        const num = parseFloat(item.amount);
+        if(isNaN(num)){ item.amount = null; fixedAmounts++; }
+        else if(item.amount !== num){ item.amount = num; }
+      }
+    });
+  };
+  fixAmounts(confirmed);
+  fixAmounts(pending);
+  fixAmounts(expenses);
+  fixAmounts(handovers);
+
+  // Remove exact duplicates (e.g. from importing the same Excel file more than once)
+  const confResult = dedupeArray(confirmed, bookingDedupeKey);
+  const pendResult = dedupeArray(pending, bookingDedupeKey);
+  const expResult = dedupeArray(expenses, expenseDedupeKey);
+  const handResult = dedupeArray(handovers, handoverDedupeKey);
+  confirmed = confResult.kept;
+  pending = pendResult.kept;
+  expenses = expResult.kept;
+  handovers = handResult.kept;
+
+  await saveConfirmed();
+  await savePending();
+  await saveExpenses();
+  await saveHandovers();
+
+  renderPending();
+  renderConfirmed();
+  renderExpenseLog();
+  renderRequisitionList();
+  renderFinancialReports();
+  renderHandoverReport();
+  updateStats();
+
+  const totalRemoved = confResult.removed + pendResult.removed + expResult.removed + handResult.removed;
+  const parts = [];
+  if(confResult.removed) parts.push(`${confResult.removed} duplicate confirmed booking(s)`);
+  if(pendResult.removed) parts.push(`${pendResult.removed} duplicate pending booking(s)`);
+  if(expResult.removed) parts.push(`${expResult.removed} duplicate expense(s)`);
+  if(handResult.removed) parts.push(`${handResult.removed} duplicate handover record(s)`);
+  if(fixedAmounts) parts.push(`${fixedAmounts} invalid amount(s) cleared`);
+
+  statusEl.textContent = parts.length > 0
+    ? `Done. Fixed: ${parts.join(', ')}. All totals refreshed.`
+    : 'Done — no duplicates or invalid amounts found. All totals refreshed from current data.';
+  showToast('Recalculation complete');
+  logActivity(`ran recalculation (removed ${totalRemoved} duplicate entries${fixedAmounts ? ', fixed ' + fixedAmounts + ' invalid amounts' : ''})`);
+}
+
+init();
+</script>
+</body>
+</html>
