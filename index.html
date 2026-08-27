@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 <style>
@@ -130,6 +131,19 @@
   .empty{color:#7a756a;font-size:13px;text-align:center;padding:30px 10px;}
   .table-wrap{overflow-x:auto;}
   .search-bar{margin-bottom:14px;}
+
+  .modal-overlay{
+    position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:60;
+    display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto;
+  }
+  .modal-card{
+    background:var(--ink-soft);border:1px solid var(--line);border-radius:12px;
+    padding:22px;width:100%;max-width:440px;margin:auto;
+  }
+  .modal-card h2{font-size:13px;text-transform:uppercase;letter-spacing:1.4px;color:var(--brass-bright);margin:0 0 4px;font-weight:600;}
+  .modal-sub{font-size:12px;color:#8f897d;margin-bottom:14px;}
+  .modal-actions{display:flex;gap:8px;margin-top:18px;}
+  .modal-actions button{flex:1;margin:0;}
 
   .toast{
     position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--brass);color:var(--ink);
@@ -273,6 +287,16 @@
           You have view-only access. An admin or member can add new bookings.
         </div>
         <div id="intakeFormContent">
+        <div style="background:var(--ink);border:1px dashed var(--line);border-radius:8px;padding:12px;margin-bottom:16px;">
+          <label style="margin-top:0;">Quick paste — one booking, or many at once</label>
+          <textarea id="quickPaste" placeholder="Paste one booking, or paste many separated by a blank line:&#10;&#10;Md Hafizzuman - +8801313352346&#10;The Executive Lounge&#10;Check in: 27.08.26&#10;1 night&#10;Amount: paid by airbnb&#10;Source: airbnb&#10;&#10;Rahim Uddin - 01711223344&#10;Urban Oasis&#10;Check in: 05.08.26&#10;3 nights&#10;Amount: 12500 received as to my bkash&#10;Source: Booking.com" style="min-height:150px;font-size:13px;"></textarea>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+            <button class="btn" style="margin:0;flex:1 1 100%;" onclick="confirmAllFromPaste()">Confirm all → add straight to database</button>
+            <button class="btn-ghost" style="margin:0;flex:1;" onclick="applyQuickPaste()">Or fill the form below (single)</button>
+            <button class="btn-ghost" style="margin:0;" onclick="document.getElementById('quickPaste').value='';document.getElementById('quickPasteStatus').textContent='';">Clear</button>
+          </div>
+          <div id="quickPasteStatus" style="font-size:11.5px;color:#8f897d;margin-top:8px;"></div>
+        </div>
         <label>Property</label>
         <select id="f-property"></select>
         <div class="row2">
@@ -338,6 +362,12 @@
       <div style="display:flex;flex-direction:column;gap:24px;">
         <div class="panel">
           <h2>Pending review</h2>
+          <div id="waImportRow" style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap;">
+            <label for="waImportInput" class="btn-ghost" style="margin:0;padding:9px 14px;cursor:pointer;display:inline-block;">Import WhatsApp chat (.zip / .txt)</label>
+            <input type="file" id="waImportInput" accept=".zip,.txt" style="display:none;" onchange="handleWhatsAppImport(event)">
+            <span style="font-size:11.5px;color:#8f897d;">Adds matching bookings to this queue for review</span>
+          </div>
+          <div id="waImportStatus" style="font-size:11.5px;color:#8f897d;margin-bottom:12px;"></div>
           <div class="cards" id="pendingList"><div class="loading-line">Loading…</div></div>
         </div>
 
@@ -349,6 +379,28 @@
             <span id="importStatus" style="font-size:11.5px;color:#8f897d;"></span>
           </div>
           <input class="search-bar" id="dbSearch" placeholder="Search guest, property, phone, ref…" oninput="renderConfirmed()">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;">
+            <div style="flex:1;min-width:150px;">
+              <label style="margin:0 0 5px;">Payment gateway</label>
+              <select id="dbGatewayFilter" onchange="renderConfirmed()">
+                <option value="__all__">All gateways</option>
+                <option value="Cash">Cash</option>
+                <option value="Saif Bkash">Saif Bkash</option>
+                <option value="Bkash Merchant">Bkash Merchant</option>
+                <option value="Brac Bank">Brac Bank</option>
+                <option value="Payoneer">Payoneer</option>
+                <option value="__unset__">Not set / other</option>
+              </select>
+            </div>
+            <div style="flex:1;min-width:150px;">
+              <label style="margin:0 0 5px;">Property</label>
+              <select id="dbPropertyFilter" onchange="renderConfirmed()">
+                <option value="__all__">All properties</option>
+              </select>
+            </div>
+            <button class="btn-ghost" style="margin:0;padding:9px 14px;" onclick="clearDbFilters()">Clear filters</button>
+          </div>
+          <div id="dbFilterSummary" style="font-size:11.5px;color:#8f897d;margin-bottom:10px;"></div>
           <div class="table-wrap">
             <table class="db-table">
               <thead><tr>
@@ -356,6 +408,7 @@
                 <th>Amount received</th><th>BDT equivalent</th><th>Gateway</th><th></th>
               </tr></thead>
               <tbody id="confirmedBody"></tbody>
+              <tfoot id="confirmedFoot"></tfoot>
             </table>
           </div>
           <div id="confirmedEmpty" class="empty" style="display:none;"></div>
@@ -671,6 +724,71 @@
 
 </div>
 
+<div class="modal-overlay" id="editOverlay" style="display:none;">
+  <div class="modal-card">
+    <h2 id="editTitle">Edit booking</h2>
+    <div class="modal-sub" id="editSub"></div>
+
+    <label>Property</label>
+    <select id="ed-property"></select>
+
+    <div class="row2">
+      <div><label>Platform</label>
+        <select id="ed-platform">
+          <option>Airbnb</option>
+          <option>Booking.com</option>
+          <option>Travela</option>
+          <option>Referred</option>
+          <option>Stayed Before</option>
+        </select>
+      </div>
+      <div><label>Booking ref / ID</label><input id="ed-ref" placeholder="optional"></div>
+    </div>
+
+    <label>Guest name</label>
+    <input id="ed-guest" placeholder="Guest full name">
+
+    <div class="row2">
+      <div><label>Check-in</label><input id="ed-checkin" type="date"></div>
+      <div><label>Check-out</label><input id="ed-checkout" type="date"></div>
+    </div>
+
+    <label>Guest phone number</label>
+    <input id="ed-contact" placeholder="e.g. 01xxxxxxxxx">
+
+    <div class="row2">
+      <div><label>Payout currency</label>
+        <select id="ed-currency" onchange="updateEditPreview()">
+          <option value="BDT">BDT</option>
+          <option value="USD">USD ($)</option>
+        </select>
+      </div>
+      <div><label id="ed-amount-label">Amount (BDT)</label>
+        <input id="ed-amount" type="number" min="0" step="0.01" placeholder="leave blank if unknown" oninput="updateEditPreview()">
+      </div>
+    </div>
+    <div id="editConvertedPreview" style="font-size:11.5px;color:#8f897d;margin-top:-6px;"></div>
+
+    <label>Payment gateway</label>
+    <select id="ed-gateway">
+      <option>Cash</option>
+      <option>Saif Bkash</option>
+      <option>Bkash Merchant</option>
+      <option>Brac Bank</option>
+      <option>Payoneer</option>
+    </select>
+
+    <label>Notes</label>
+    <textarea id="ed-notes" placeholder="Any extra detail"></textarea>
+
+    <div class="modal-actions">
+      <button class="btn" onclick="saveEditBooking()">Save changes</button>
+      <button class="btn-ghost" onclick="closeEditBooking()">Cancel</button>
+    </div>
+    <div id="editStatus" style="font-size:11.5px;color:var(--red);margin-top:10px;"></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -967,6 +1085,8 @@ async function enterApp(){
   document.getElementById('expenseViewOnlyMsg').style.display = isViewer ? 'block' : 'none';
   const importRow = document.getElementById('excelImportInput');
   if(importRow) importRow.previousElementSibling.style.display = isViewer ? 'none' : 'inline-block';
+  const waRow = document.getElementById('waImportRow');
+  if(waRow) waRow.style.display = isViewer ? 'none' : 'flex';
   document.getElementById('exportPanel').style.display = session.role === 'admin' ? 'block' : 'none';
   document.getElementById('recalcPanel').style.display = session.role === 'admin' ? 'block' : 'none';
 
@@ -1564,6 +1684,548 @@ async function removeProperty(i){
 }
 
 // ---------------- Pending / Confirmed ----------------
+// ---------------- Quick paste parser ----------------
+// Booking messages arrive as loose text, e.g.
+//   Md Hafizzuman - +8801313352346
+//   The Executive Lounge
+//   Check in: 27.08.26
+//   1 night
+//   Amount: paid by airbnb
+//   Source: airbnb
+// This pulls out each field so the form below can be filled in one click.
+
+function stripInvisible(s){
+  // Phone numbers copied from chat apps often carry LTR/RTL marks (U+202A–U+202E, U+200E/F, U+061C)
+  return String(s || '').replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069\u061C]/g, '');
+}
+
+function pad2(n){ return String(n).padStart(2, '0'); }
+
+// Accepts 27.08.26, 27/08/2026, 27-08-26, 2026-08-27 → returns "YYYY-MM-DD" (day-first for ambiguous forms)
+function parseLooseDate(str){
+  const s = stripInvisible(str).trim();
+  if(!s) return '';
+  const iso = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(iso) return `${iso[1]}-${pad2(iso[2])}-${pad2(iso[3])}`;
+  const dmy = s.match(/(\d{1,2})[.\/\-](\d{1,2})[.\/\-](\d{2,4})/);
+  if(dmy){
+    let yr = dmy[3];
+    if(yr.length === 2) yr = '20' + yr;
+    return `${yr}-${pad2(dmy[2])}-${pad2(dmy[1])}`;
+  }
+  return '';
+}
+
+// Adds whole days to a YYYY-MM-DD string without any timezone drift
+function addDaysISO(iso, days){
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m) return '';
+  const dt = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return `${dt.getUTCFullYear()}-${pad2(dt.getUTCMonth() + 1)}-${pad2(dt.getUTCDate())}`;
+}
+
+function matchPlatformLoose(raw){
+  const v = stripInvisible(raw).trim().toLowerCase();
+  if(!v) return '';
+  if(v.includes('airbnb')) return 'Airbnb';
+  if(v.includes('booking')) return 'Booking.com';
+  if(v.includes('travela')) return 'Travela';
+  if(v.includes('refer') || v.includes('reffer')) return 'Referred';
+  if(v.includes('stayed')) return 'Stayed Before';
+  return '';
+}
+
+// Works out which gateway the money landed in, from how the message is worded.
+// An explicit mention always wins; only if nothing is stated do we fall back to
+// what the booking platform implies (Airbnb payouts arrive via Payoneer, Travela via Brac).
+function detectGateway(fullText, platform){
+  const t = stripInvisible(fullText).toLowerCase();
+
+  // Check the most specific wordings first — "bkash merchant" must not be read as personal bkash.
+  if(/merchant/.test(t)) return 'Bkash Merchant';
+  if(/(saif|my|amar|personal)\s*'?s?\s*bkash|bkash\s*(of\s*)?(saif|mine)/.test(t)) return 'Saif Bkash';
+  if(/\bbrac\b|brac\s*bank/.test(t)) return 'Brac Bank';
+  if(/payoneer|payonner/.test(t)) return 'Payoneer';
+  if(/\bcash\b|hate\s*pai|hate\s*peyechi/.test(t)) return 'Cash';
+  if(/\bbkash\b/.test(t)) return 'Saif Bkash'; // plain "bkash" with no qualifier = personal account
+
+  // Nothing stated — infer from the platform.
+  const p = String(platform || '').toLowerCase();
+  if(p.includes('airbnb')) return 'Payoneer';
+  if(p.includes('travela')) return 'Brac Bank';
+  return '';
+}
+
+function parseBookingText(text){
+  const lines = stripInvisible(text).split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const out = { guest:'', contact:'', property:'', checkin:'', checkout:'', nights:null, amount:'', platform:'', gateway:'', notes:'' };
+  if(lines.length === 0) return out;
+
+  const labelled = {};
+  const plainLines = [];
+  lines.forEach(line => {
+    const m = line.match(/^([A-Za-z][A-Za-z \-\/]*?)\s*:\s*(.*)$/);
+    if(m) labelled[m[1].trim().toLowerCase().replace(/[\s\-]+/g, '')] = m[2].trim();
+    else plainLines.push(line);
+  });
+
+  // Phone: any line containing a long digit run (with optional +, spaces, dashes)
+  for(const line of lines){
+    const p = line.match(/\+?\d[\d\s\-]{8,}\d/);
+    if(p){ out.contact = p[0].replace(/[\s\-]/g, ''); break; }
+  }
+
+  // Guest: first line, minus the phone and any trailing separator
+  let firstLine = lines[0];
+  if(out.contact){
+    firstLine = firstLine.replace(/\+?\d[\d\s\-]{8,}\d/, '');
+  }
+  out.guest = firstLine.replace(/[\-–—:,]+\s*$/, '').replace(/^\s*[\-–—:,]+/, '').trim();
+
+  // Property: the line that best matches a known property (ignores case and a leading "The")
+  for(const line of lines){
+    const norm = normalizeForMatch(line);
+    const hit = properties.find(p => normalizeForMatch(p) === norm);
+    if(hit){ out.property = hit; break; }
+  }
+  if(!out.property){
+    for(const line of lines){
+      const norm = normalizeForMatch(line);
+      const hit = properties.find(p => norm && (norm.includes(normalizeForMatch(p)) || normalizeForMatch(p).includes(norm)));
+      if(hit){ out.property = hit; break; }
+    }
+  }
+
+  out.checkin = parseLooseDate(labelled.checkin || labelled['checkindate'] || '');
+  out.checkout = parseLooseDate(labelled.checkout || labelled['checkoutdate'] || '');
+
+  const nightsLine = lines.find(l => /\d+\s*nights?\b/i.test(l));
+  if(nightsLine){
+    const n = nightsLine.match(/(\d+)\s*nights?/i);
+    if(n) out.nights = parseInt(n[1], 10);
+  }
+  if(!out.checkout && out.checkin && out.nights) out.checkout = addDaysISO(out.checkin, out.nights);
+
+  // Amount: only take it when there's an actual number ("paid by airbnb" has none)
+  const amountRaw = labelled.amount || '';
+  const amtNum = amountRaw.match(/(\d[\d,]*(?:\.\d+)?)/);
+  if(amtNum) out.amount = amtNum[1].replace(/,/g, '');
+  else if(amountRaw) out.notes = amountRaw;
+
+  out.platform = matchPlatformLoose(labelled.source || labelled.platform || '')
+    || matchPlatformLoose(lines.join(' '));
+
+  out.gateway = detectGateway(text, out.platform);
+
+  return out;
+}
+
+// Splits a pasted blob into individual bookings. Handles both a WhatsApp-style
+// paste (timestamped lines) and plain blocks separated by a blank line.
+function splitBookingBlocks(text){
+  const waMsgs = splitWhatsAppMessages(text);
+  if(waMsgs.length > 0) return waMsgs.map(m => m.body);
+  return String(text || '').split(/\n\s*\n/).map(b => b.trim()).filter(Boolean);
+}
+
+async function confirmAllFromPaste(){
+  if(isViewer){ showToast('View-only access'); return; }
+  const statusEl = document.getElementById('quickPasteStatus');
+  const raw = document.getElementById('quickPaste').value;
+  if(!raw.trim()){ statusEl.style.color = '#8f897d'; statusEl.textContent = 'Paste the booking messages first.'; return; }
+
+  statusEl.style.color = '#8f897d';
+  statusEl.textContent = 'Reading…';
+
+  const blocks = splitBookingBlocks(raw);
+  const parsed = [];
+  let unreadable = 0;
+  for(const b of blocks){
+    const p = parseBookingText(b);
+    if(p.property && p.checkin && p.guest) parsed.push(p);
+    else if(b.trim().length > 10) unreadable++;
+  }
+
+  if(parsed.length === 0){
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = 'Could not read any booking. Each one needs a known property name, a guest name and a "Check in:" date. Separate multiple bookings with a blank line.';
+    return;
+  }
+
+  // Only take bookings whose check-in falls in the month tab you're on.
+  const forThisMonth = parsed.filter(p => monthLabelFromISO(p.checkin) === currentMonth);
+  const otherMonths = {};
+  parsed.forEach(p => {
+    const lbl = monthLabelFromISO(p.checkin);
+    if(lbl && lbl !== currentMonth) otherMonths[lbl] = (otherMonths[lbl] || 0) + 1;
+  });
+
+  // Skip anything already in this month, whether pending or already confirmed.
+  const seen = new Set();
+  [...pending, ...confirmed].filter(x => x.month === currentMonth).forEach(x => {
+    seen.add([x.property, (x.guest||'').toLowerCase().trim(), x.checkin].join('|'));
+  });
+
+  const toAdd = [];
+  let skippedDup = 0;
+  for(const p of forThisMonth){
+    const key = [p.property, (p.guest||'').toLowerCase().trim(), p.checkin].join('|');
+    if(seen.has(key)){ skippedDup++; continue; }
+    seen.add(key);
+    const now = new Date().toISOString();
+    toAdd.push({
+      id: uid(),
+      property: p.property,
+      platform: p.platform || 'Airbnb',
+      ref: '',
+      guest: p.guest,
+      checkin: p.checkin,
+      checkout: p.checkout || '',
+      contact: p.contact || '',
+      currency: 'BDT',
+      amount: p.amount === '' ? null : parseFloat(p.amount),
+      gateway: p.gateway || 'Cash',
+      notes: ['Added by quick paste.', p.notes].filter(Boolean).join(' '),
+      month: currentMonth,
+      addedBy: session.name, addedAt: now,
+      confirmedBy: session.name, confirmedAt: now,
+      needsCompletion: !p.checkin || !p.checkout || !p.contact
+    });
+  }
+
+  if(toAdd.length > 0){
+    confirmed = [...toAdd, ...confirmed];
+    await saveConfirmed();
+    renderConfirmed();
+    updateStats();
+    renderFinancialReports();
+    renderHandoverReport();
+  }
+
+  const parts = [`${toAdd.length} booking(s) added straight to the confirmed database for ${currentMonth}`];
+  if(skippedDup > 0) parts.push(`${skippedDup} already there, skipped`);
+  if(unreadable > 0) parts.push(`${unreadable} block(s) could not be read`);
+  const otherKeys = Object.keys(otherMonths);
+  if(otherKeys.length > 0){
+    parts.push(`${otherKeys.map(k => `${otherMonths[k]} for ${k}`).join(', ')} — switch to that month tab and paste again`);
+  }
+  statusEl.style.color = toAdd.length > 0 ? 'var(--green)' : '#8f897d';
+  statusEl.textContent = `Read ${parsed.length} booking(s). ` + parts.join('. ') + '.';
+
+  if(toAdd.length > 0){
+    showToast(`${toAdd.length} bookings confirmed`);
+    logActivity(`added ${toAdd.length} bookings straight to the confirmed database via quick paste (${currentMonth})`);
+    document.getElementById('quickPaste').value = '';
+  }
+}
+
+function applyQuickPaste(){
+  const statusEl = document.getElementById('quickPasteStatus');
+  const raw = document.getElementById('quickPaste').value;
+  if(!raw.trim()){ statusEl.textContent = 'Paste the booking message first.'; return; }
+
+  const p = parseBookingText(raw);
+  const filled = [], missing = [];
+
+  if(p.property){ document.getElementById('f-property').value = p.property; filled.push('property'); }
+  else missing.push('property');
+
+  if(p.platform){ document.getElementById('f-platform').value = p.platform; filled.push('platform'); }
+  else missing.push('platform');
+
+  if(p.guest){ document.getElementById('f-guest').value = p.guest; filled.push('guest'); }
+  else missing.push('guest');
+
+  if(p.contact){ document.getElementById('f-contact').value = p.contact; filled.push('phone'); }
+  else missing.push('phone');
+
+  if(p.checkin){ document.getElementById('f-checkin').value = p.checkin; filled.push('check-in'); }
+  else missing.push('check-in');
+
+  if(p.checkout){ document.getElementById('f-checkout').value = p.checkout; filled.push('check-out'); }
+  else missing.push('check-out');
+
+  if(p.amount){ document.getElementById('f-amount').value = p.amount; filled.push('amount'); }
+  else missing.push('amount');
+
+  if(p.gateway){ document.getElementById('f-gateway').value = p.gateway; filled.push('gateway'); }
+  else missing.push('gateway');
+
+  if(p.notes){
+    const notesEl = document.getElementById('f-notes');
+    notesEl.value = notesEl.value ? notesEl.value + ' ' + p.notes : p.notes;
+  }
+
+  updateConvertedPreview();
+
+  let msg = filled.length ? `Filled: ${filled.join(', ')}.` : 'Could not read any fields — check the format.';
+  if(missing.length) msg += ` Still needs: ${missing.join(', ')}.`;
+  statusEl.textContent = msg + ' Review the form, then press "Add to pending queue".';
+}
+
+// ---------------- WhatsApp chat import ----------------
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+// "2026-08-27" -> "August'26", matching how month tabs are labelled
+function monthLabelFromISO(iso){
+  const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m) return '';
+  const year2 = m[1].slice(2);
+  return `${MONTH_NAMES[parseInt(m[2],10) - 1]}'${year2}`;
+}
+
+// WhatsApp exports look like either:
+//   [27/08/2026, 10:15:32] Saif: message
+//   27/08/2026, 10:15 - Saif: message
+// A message can span several lines; continuation lines have no timestamp prefix.
+const WA_START = /^\u200e?\[?(\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4}),?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:[AaPpنص][Mm]?\.?)?\]?\s*[-–]?\s*([^:]{1,60}?):\s?([\s\S]*)$/;
+
+function splitWhatsAppMessages(text){
+  const lines = String(text || '').replace(/\r/g, '').split('\n');
+  const msgs = [];
+  let cur = null;
+  for(const line of lines){
+    const m = line.match(WA_START);
+    if(m){
+      if(cur) msgs.push(cur);
+      cur = { date: m[1], sender: m[2].trim(), body: m[3] };
+    } else if(cur){
+      cur.body += '\n' + line;
+    }
+  }
+  if(cur) msgs.push(cur);
+  return msgs;
+}
+
+// A chat has lots of normal conversation — only treat a message as a booking when it
+// resolves to a known property AND a check-in date, which ordinary chatter won't.
+function extractBookingsFromChat(text){
+  const out = [];
+  for(const msg of splitWhatsAppMessages(text)){
+    if(!msg.body || msg.body.length < 15) continue;
+    if(/<Media omitted>|image omitted|sticker omitted/i.test(msg.body)) continue;
+    const p = parseBookingText(msg.body);
+    if(p.property && p.checkin && p.guest) out.push(p);
+  }
+  return out;
+}
+
+async function readChatFileFromUpload(file){
+  const name = (file.name || '').toLowerCase();
+  if(name.endsWith('.txt')) return await file.text();
+
+  if(typeof JSZip === 'undefined'){
+    throw new Error('Zip reader did not load — check your internet connection and try again.');
+  }
+  const zip = await JSZip.loadAsync(await file.arrayBuffer());
+  // WhatsApp names it "_chat.txt" (iOS) or "WhatsApp Chat with X.txt" (Android)
+  const txtNames = Object.keys(zip.files).filter(n => /\.txt$/i.test(n) && !zip.files[n].dir);
+  if(txtNames.length === 0) throw new Error('No .txt chat file found inside that zip.');
+  txtNames.sort((a,b) => (/_chat\.txt$/i.test(b) ? 1 : 0) - (/_chat\.txt$/i.test(a) ? 1 : 0));
+  return await zip.files[txtNames[0]].async('string');
+}
+
+async function handleWhatsAppImport(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('waImportStatus');
+  statusEl.style.color = '#8f897d';
+  statusEl.textContent = 'Reading chat export…';
+
+  try{
+    const text = await readChatFileFromUpload(file);
+    const found = extractBookingsFromChat(text);
+
+    if(found.length === 0){
+      statusEl.textContent = 'No booking messages recognised in that chat. A message needs a known property name, a guest name and a "Check in:" date to be picked up.';
+      return;
+    }
+
+    // Only pull in bookings whose check-in falls inside the month tab you're on.
+    const forThisMonth = found.filter(p => monthLabelFromISO(p.checkin) === currentMonth);
+    const otherMonths = {};
+    found.forEach(p => {
+      const lbl = monthLabelFromISO(p.checkin);
+      if(lbl && lbl !== currentMonth) otherMonths[lbl] = (otherMonths[lbl] || 0) + 1;
+    });
+
+    // Skip anything already sitting in pending or already confirmed for this month.
+    const seen = new Set();
+    [...pending, ...confirmed].filter(x => x.month === currentMonth).forEach(x => {
+      seen.add([x.property, (x.guest||'').toLowerCase().trim(), x.checkin].join('|'));
+    });
+
+    const toAdd = [];
+    let skippedDup = 0;
+    for(const p of forThisMonth){
+      const key = [p.property, (p.guest||'').toLowerCase().trim(), p.checkin].join('|');
+      if(seen.has(key)){ skippedDup++; continue; }
+      seen.add(key);
+      toAdd.push({
+        id: uid(),
+        property: p.property,
+        platform: p.platform || 'Airbnb',
+        ref: '',
+        guest: p.guest,
+        checkin: p.checkin,
+        checkout: p.checkout || '',
+        contact: p.contact || '',
+        currency: 'BDT',
+        amount: p.amount === '' ? null : parseFloat(p.amount),
+        gateway: p.gateway || 'Cash',
+        notes: ['Imported from WhatsApp chat.', p.notes].filter(Boolean).join(' '),
+        month: currentMonth,
+        addedBy: session.name,
+        addedAt: new Date().toISOString(),
+        needsCompletion: !p.checkin || !p.checkout || !p.contact
+      });
+    }
+
+    if(toAdd.length > 0){
+      pending = [...toAdd, ...pending];
+      await savePending();
+      renderPending();
+      updateStats();
+    }
+
+    const parts = [];
+    parts.push(`${toAdd.length} booking(s) added to the pending queue for ${currentMonth}`);
+    if(skippedDup > 0) parts.push(`${skippedDup} already in this month, skipped`);
+    const otherKeys = Object.keys(otherMonths);
+    if(otherKeys.length > 0){
+      parts.push(`${otherKeys.map(k => `${otherMonths[k]} for ${k}`).join(', ')} — switch to that month tab and import again to bring those in`);
+    }
+    statusEl.style.color = toAdd.length > 0 ? 'var(--green)' : '#8f897d';
+    statusEl.textContent = `Found ${found.length} booking message(s). ` + parts.join('. ') + '.';
+    if(toAdd.length > 0){
+      showToast(`${toAdd.length} bookings added for review`);
+      logActivity(`imported ${toAdd.length} bookings from a WhatsApp chat export into ${currentMonth}`);
+    }
+  }catch(e){
+    console.error('WhatsApp import failed', e);
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = 'Import failed: ' + (e && e.message ? e.message : 'unknown error');
+  } finally {
+    event.target.value = '';
+  }
+}
+
+// ---------------- Edit an existing booking ----------------
+let editingId = null, editingType = null;
+
+function updateEditPreview(){
+  const cur = document.getElementById('ed-currency').value;
+  document.getElementById('ed-amount-label').textContent = cur === 'USD' ? 'Amount (USD $)' : 'Amount (BDT)';
+  const amt = parseFloat(document.getElementById('ed-amount').value);
+  const prev = document.getElementById('editConvertedPreview');
+  prev.textContent = (cur === 'USD' && !isNaN(amt))
+    ? '≈ BDT ' + Math.round(amt * USD_TO_BDT).toLocaleString('en-IN') + ' (at ' + USD_TO_BDT + '/USD)'
+    : '';
+}
+
+function openEditBooking(id, type){
+  if(isViewer){ showToast('View-only access'); return; }
+  const arr = type === 'pending' ? pending : confirmed;
+  const entry = arr.find(x => x.id === id);
+  if(!entry){ showToast('Could not find that booking'); return; }
+
+  editingId = id;
+  editingType = type;
+
+  // Property list can grow via imports, so rebuild it each time — and keep the
+  // entry's own property even if it isn't in the list, so editing never loses it.
+  const propSel = document.getElementById('ed-property');
+  const opts = properties.slice();
+  if(entry.property && !opts.includes(entry.property)) opts.unshift(entry.property);
+  propSel.innerHTML = opts.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
+  propSel.value = entry.property || opts[0] || '';
+
+  const platSel = document.getElementById('ed-platform');
+  if(entry.platform && ![...platSel.options].some(o => o.value === entry.platform)){
+    platSel.insertAdjacentHTML('afterbegin', `<option>${escapeHtml(entry.platform)}</option>`);
+  }
+  platSel.value = entry.platform || 'Airbnb';
+
+  const gwSel = document.getElementById('ed-gateway');
+  if(entry.gateway && ![...gwSel.options].some(o => o.value === entry.gateway)){
+    gwSel.insertAdjacentHTML('afterbegin', `<option>${escapeHtml(entry.gateway)}</option>`);
+  }
+  gwSel.value = entry.gateway || 'Cash';
+
+  document.getElementById('ed-ref').value = entry.ref || '';
+  document.getElementById('ed-guest').value = entry.guest || '';
+  document.getElementById('ed-checkin').value = entry.checkin || '';
+  document.getElementById('ed-checkout').value = entry.checkout || '';
+  document.getElementById('ed-contact').value = entry.contact || '';
+  document.getElementById('ed-currency').value = entry.currency || 'BDT';
+  document.getElementById('ed-amount').value = (entry.amount === null || entry.amount === undefined) ? '' : entry.amount;
+  document.getElementById('ed-notes').value = entry.notes || '';
+
+  document.getElementById('editTitle').textContent = type === 'pending' ? 'Edit pending booking' : 'Edit confirmed booking';
+  document.getElementById('editSub').textContent = `${entry.guest || 'Unnamed guest'} · ${entry.month || currentMonth}`;
+  document.getElementById('editStatus').textContent = '';
+  updateEditPreview();
+  document.getElementById('editOverlay').style.display = 'flex';
+}
+
+function closeEditBooking(){
+  document.getElementById('editOverlay').style.display = 'none';
+  editingId = null;
+  editingType = null;
+}
+
+async function saveEditBooking(){
+  if(isViewer){ showToast('View-only access'); return; }
+  const statusEl = document.getElementById('editStatus');
+  const arr = editingType === 'pending' ? pending : confirmed;
+  const entry = arr.find(x => x.id === editingId);
+  if(!entry){ statusEl.textContent = 'That booking no longer exists.'; return; }
+
+  const guest = document.getElementById('ed-guest').value.trim();
+  if(!guest){ statusEl.textContent = 'Guest name cannot be empty.'; return; }
+
+  const checkin = document.getElementById('ed-checkin').value;
+  const checkout = document.getElementById('ed-checkout').value;
+  if(checkin && checkout && checkout <= checkin){
+    statusEl.textContent = 'Check-out must be after check-in.';
+    return;
+  }
+
+  const rawAmount = document.getElementById('ed-amount').value;
+  if(rawAmount !== '' && isNaN(parseFloat(rawAmount))){
+    statusEl.textContent = 'Amount must be a number, or left blank.';
+    return;
+  }
+
+  entry.property = document.getElementById('ed-property').value;
+  entry.platform = document.getElementById('ed-platform').value;
+  entry.ref = document.getElementById('ed-ref').value.trim();
+  entry.guest = guest;
+  entry.checkin = checkin;
+  entry.checkout = checkout;
+  entry.contact = document.getElementById('ed-contact').value.trim();
+  entry.currency = document.getElementById('ed-currency').value;
+  entry.amount = rawAmount === '' ? null : parseFloat(rawAmount);
+  entry.gateway = document.getElementById('ed-gateway').value;
+  entry.notes = document.getElementById('ed-notes').value.trim();
+  entry.needsCompletion = !entry.checkin || !entry.checkout || !entry.contact;
+  entry.editedBy = session.name;
+  entry.editedAt = new Date().toISOString();
+
+  if(editingType === 'pending') await savePending(); else await saveConfirmed();
+
+  renderPending();
+  renderConfirmed();
+  updateStats();
+  renderFinancialReports();
+  renderHandoverReport();
+
+  closeEditBooking();
+  showToast('Booking updated');
+  logActivity(`edited ${entry.guest}'s ${editingType === 'pending' ? 'pending' : 'confirmed'} booking (${entry.property})`);
+}
+
 async function addPending(){
   const property = document.getElementById('f-property').value;
   const platform = document.getElementById('f-platform').value;
@@ -1602,7 +2264,7 @@ function clearForm(){
 }
 function renderPending(){
   const el = document.getElementById('pendingList');
-  const scoped = pending.filter(p => p.month === currentMonth);
+  const scoped = sortByCheckin(pending.filter(p => p.month === currentMonth));
   if(scoped.length === 0){ el.innerHTML = '<div class="empty">No bookings waiting for review.</div>'; return; }
   el.innerHTML = scoped.map(p => `
     <div class="card pending">
@@ -1621,6 +2283,7 @@ function renderPending(){
       ${isViewer ? '' : `
       <div class="card-actions">
         <button class="accept-btn" onclick="acceptBooking('${p.id}')">Accept → Confirm</button>
+        <button class="btn-ghost" style="margin:0;flex:0 0 auto;padding:8px 12px;" onclick="openEditBooking('${p.id}','pending')">Edit</button>
         <button class="reject-btn" onclick="rejectBooking('${p.id}')">Reject</button>
       </div>`}
     </div>
@@ -1649,17 +2312,106 @@ async function rejectBooking(id){
   showToast('Booking rejected');
   logActivity(`rejected the booking for ${entry.guest} (${entry.property})`);
 }
+// Confirmed bookings should always read in calendar order (1st of the month first),
+// no matter what order they were accepted in. Rows with no check-in date yet sink
+// to the bottom so they're easy to spot and complete.
+function sortByCheckin(list){
+  return list.slice().sort((a, b) => {
+    const da = a.checkin || '';
+    const db = b.checkin || '';
+    if(!da && !db) return (a.guest || '').localeCompare(b.guest || '');
+    if(!da) return 1;
+    if(!db) return -1;
+    if(da !== db) return da < db ? -1 : 1;
+    return (a.guest || '').localeCompare(b.guest || '');
+  });
+}
+
+const FILTER_UNSET = '__unset__';
+
+function clearDbFilters(){
+  document.getElementById('dbSearch').value = '';
+  document.getElementById('dbGatewayFilter').value = '__all__';
+  document.getElementById('dbPropertyFilter').value = '__all__';
+  renderConfirmed();
+}
+
+// Keeps the property dropdown showing whatever properties actually appear this month.
+function populateDbPropertyFilter(monthScoped){
+  const sel = document.getElementById('dbPropertyFilter');
+  if(!sel) return;
+  const current = sel.value || '__all__';
+  const props = Array.from(new Set(monthScoped.map(c => c.property || 'Unspecified'))).sort();
+  sel.innerHTML = '<option value="__all__">All properties</option>' +
+    props.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
+  sel.value = [...sel.options].some(o => o.value === current) ? current : '__all__';
+}
+
 function renderConfirmed(){
   const q = (document.getElementById('dbSearch').value || '').toLowerCase();
   const body = document.getElementById('confirmedBody');
   const emptyEl = document.getElementById('confirmedEmpty');
   const monthScoped = confirmed.filter(c => c.month === currentMonth);
-  const filtered = monthScoped.filter(c => !q ||
-    (c.guest||'').toLowerCase().includes(q) || (c.property||'').toLowerCase().includes(q) || (c.ref||'').toLowerCase().includes(q) || (c.contact||'').toLowerCase().includes(q));
+
+  populateDbPropertyFilter(monthScoped);
+  const gwEl = document.getElementById('dbGatewayFilter');
+  const propEl = document.getElementById('dbPropertyFilter');
+  const gwFilter = gwEl ? gwEl.value : '__all__';
+  const propFilter = propEl ? propEl.value : '__all__';
+
+  const filtered = sortByCheckin(monthScoped.filter(c => {
+    const matchesSearch = !q ||
+      (c.guest||'').toLowerCase().includes(q) || (c.property||'').toLowerCase().includes(q) ||
+      (c.ref||'').toLowerCase().includes(q) || (c.contact||'').toLowerCase().includes(q);
+    if(!matchesSearch) return false;
+
+    if(gwFilter !== '__all__'){
+      if(gwFilter === FILTER_UNSET){
+        if(FIXED_GATEWAYS.includes(c.gateway)) return false;
+      } else if(c.gateway !== gwFilter) return false;
+    }
+
+    if(propFilter !== '__all__' && (c.property || 'Unspecified') !== propFilter) return false;
+    return true;
+  }));
+
+  // Running total of exactly what's on screen — makes cross-checking a gateway against
+  // the bank/bKash statement straightforward. Recomputed on every render, so editing,
+  // removing or adding a booking updates it immediately.
+  const shownTotalBdt = filtered.reduce((s,c) => s + toBdtNumber(c.amount, c.currency), 0);
+  const missingAmount = filtered.filter(c => c.amount === null || c.amount === undefined || c.amount === '').length;
+
+  const summaryEl = document.getElementById('dbFilterSummary');
+  if(summaryEl){
+    const bits = [];
+    if(gwFilter !== '__all__') bits.push(gwFilter === FILTER_UNSET ? 'Not set / other' : gwFilter);
+    if(propFilter !== '__all__') bits.push(propFilter);
+    if(q) bits.push(`"${q}"`);
+
+    const scopeLabel = bits.length ? bits.join(' · ') : 'All bookings';
+    let txt = `${scopeLabel} — showing ${filtered.length} of ${monthScoped.length} · `
+      + `Total BDT ${Math.round(shownTotalBdt).toLocaleString('en-IN')}`;
+    if(missingAmount > 0) txt += ` · ${missingAmount} with no amount yet`;
+    summaryEl.textContent = txt;
+    summaryEl.style.color = bits.length ? 'var(--brass-bright)' : '#8f897d';
+  }
+
+  const footEl = document.getElementById('confirmedFoot');
+  if(footEl){
+    footEl.innerHTML = filtered.length === 0 ? '' : `
+      <tr style="font-weight:600;border-top:2px solid var(--line);">
+        <td colspan="8" style="text-align:right;">Total (${filtered.length} booking${filtered.length===1?'':'s'} shown)</td>
+        <td>BDT ${Math.round(shownTotalBdt).toLocaleString('en-IN')}</td>
+        <td colspan="2"></td>
+      </tr>`;
+  }
+
   if(filtered.length === 0){
     body.innerHTML = '';
     emptyEl.style.display = 'block';
-    emptyEl.textContent = monthScoped.length === 0 ? `No confirmed bookings yet for ${escapeHtml(currentMonth)}. Accept a pending booking to add it here.` : 'No matches for your search.';
+    emptyEl.textContent = monthScoped.length === 0
+      ? `No confirmed bookings yet for ${currentMonth}. Accept a pending booking to add it here.`
+      : 'No bookings match these filters.';
     return;
   }
   emptyEl.style.display = 'none';
@@ -1675,7 +2427,7 @@ function renderConfirmed(){
       <td>${fmtReceived(c.amount, c.currency)}</td>
       <td>${fmtBdtEquivalent(c.amount, c.currency)}</td>
       <td>${escapeHtml(c.gateway || '—')}</td>
-      <td>${isViewer ? '' : `<button class="btn-ghost" style="margin:0;padding:5px 10px;font-size:11px;" onclick="removeConfirmed('${c.id}')">Remove</button>`}</td>
+      <td>${isViewer ? '' : `<button class="btn-ghost" style="margin:0;padding:5px 10px;font-size:11px;" onclick="openEditBooking('${c.id}','confirmed')">Edit</button> <button class="btn-ghost" style="margin:0;padding:5px 10px;font-size:11px;" onclick="removeConfirmed('${c.id}')">Remove</button>`}</td>
     </tr>
   `).join('');
 }
@@ -2342,7 +3094,7 @@ function renderPropertyReport(){
 function todayStr(){ return new Date().toISOString().slice(0,10); }
 
 function bookingRowsForExport(list){
-  return list.filter(c => c.month === currentMonth).map(c => ({
+  return sortByCheckin(list.filter(c => c.month === currentMonth)).map(c => ({
     Property: c.property || '',
     Platform: c.platform || '',
     Guest: c.guest || '',
@@ -2472,11 +3224,11 @@ function buildReportSections(){
   return {
     confirmedTable: tableHtml(
       ['Property','Platform','Guest','Check-in','Check-out','Nights','Amount Received','BDT Equivalent','Gateway','Phone','Ref','Added By'],
-      confirmed.filter(c => c.month === currentMonth).map(c => [c.property||'', c.platform||'', c.guest||'', fmtDate(c.checkin), fmtDate(c.checkout), nights(c.checkin,c.checkout), fmtReceived(c.amount,c.currency), fmtBdtEquivalent(c.amount,c.currency), c.gateway||'', c.contact||'', c.ref||'', c.addedBy||''])
+      sortByCheckin(confirmed.filter(c => c.month === currentMonth)).map(c => [c.property||'', c.platform||'', c.guest||'', fmtDate(c.checkin), fmtDate(c.checkout), nights(c.checkin,c.checkout), fmtReceived(c.amount,c.currency), fmtBdtEquivalent(c.amount,c.currency), c.gateway||'', c.contact||'', c.ref||'', c.addedBy||''])
     ),
     pendingTable: tableHtml(
       ['Property','Platform','Guest','Check-in','Check-out','Amount','Gateway','Phone','Added By'],
-      pending.filter(p => p.month === currentMonth).map(p => [p.property||'', p.platform||'', p.guest||'', fmtDate(p.checkin), fmtDate(p.checkout), fmtReceived(p.amount,p.currency), p.gateway||'', p.contact||'', p.addedBy||''])
+      sortByCheckin(pending.filter(p => p.month === currentMonth)).map(p => [p.property||'', p.platform||'', p.guest||'', fmtDate(p.checkin), fmtDate(p.checkout), fmtReceived(p.amount,p.currency), p.gateway||'', p.contact||'', p.addedBy||''])
     ),
     gatewayTable: tableHtml(['Gateway','Total Received (BDT)'], gw.map(g => [g.gateway, 'BDT ' + Math.round(g.total).toLocaleString('en-IN')])),
     handoverTable: tableHtml(['Property','Total Handover (BDT)'], handoverSummary.map(h => [h.property, 'BDT ' + Math.round(h.total).toLocaleString('en-IN')])),
@@ -2577,11 +3329,11 @@ function exportPdfReport(){
     addPageTitle(`Greyroom Reservations & Financial Report — ${currentMonth}`);
     addSection('Confirmed Bookings',
       ['Property','Platform','Guest','Check-in','Check-out','Nights','Amount','BDT Equiv','Gateway','Phone'],
-      confirmed.filter(c => c.month === currentMonth).map(c => [c.property||'', c.platform||'', c.guest||'', fmtDate(c.checkin), fmtDate(c.checkout), nights(c.checkin,c.checkout), fmtReceived(c.amount,c.currency), fmtBdtEquivalent(c.amount,c.currency), c.gateway||'', c.contact||'']));
+      sortByCheckin(confirmed.filter(c => c.month === currentMonth)).map(c => [c.property||'', c.platform||'', c.guest||'', fmtDate(c.checkin), fmtDate(c.checkout), nights(c.checkin,c.checkout), fmtReceived(c.amount,c.currency), fmtBdtEquivalent(c.amount,c.currency), c.gateway||'', c.contact||'']));
 
     addSection('Pending Bookings',
       ['Property','Platform','Guest','Check-in','Check-out','Amount','Gateway','Phone'],
-      pending.filter(p => p.month === currentMonth).map(p => [p.property||'', p.platform||'', p.guest||'', fmtDate(p.checkin), fmtDate(p.checkout), fmtReceived(p.amount,p.currency), p.gateway||'', p.contact||'']));
+      sortByCheckin(pending.filter(p => p.month === currentMonth)).map(p => [p.property||'', p.platform||'', p.guest||'', fmtDate(p.checkin), fmtDate(p.checkout), fmtReceived(p.amount,p.currency), p.gateway||'', p.contact||'']));
 
     // ---- Force a fresh page for Financials so it can never get lost after a large bookings table ----
     doc.addPage();
