@@ -698,6 +698,15 @@
     </div>
 
     <div class="panel" style="margin-top:24px;">
+      <h2>Google Sheet reservation tabs</h2>
+      <div style="font-size:12.5px;color:#9a958a;margin-bottom:14px;">
+        Each month gets its own readable tab in your Google Sheet, laid out like the Greyroom sales sheet. It updates on its own every time a booking is confirmed, edited or removed. Use this if you want to rebuild every month's tab in one go.
+      </div>
+      <button class="btn-ghost" style="margin:0;" onclick="rebuildAllMonthSheets()">Rebuild all month tabs</button>
+      <div id="sheetSyncStatus" style="font-size:11.5px;color:#8f897d;margin-top:10px;"></div>
+    </div>
+
+    <div class="panel" style="margin-top:24px;">
       <h2>Migrate old data</h2>
       <div style="font-size:12.5px;color:#9a958a;margin-bottom:14px;">
         This app now saves to Google Sheets instead of Claude's old storage. If any bookings, expenses, handovers, or months are still sitting in that old storage from before the switch, this pulls them in and merges them into Google Sheets. Safe to run any time — it never deletes anything.
@@ -1178,7 +1187,88 @@ async function loadData(){
 async function saveMonths(){ await storageSet('greyroom:months', JSON.stringify(months)); }
 
 async function savePending(){ await storageSet('greyroom:pending', JSON.stringify(pending)); }
-async function saveConfirmed(){ await storageSet('greyroom:confirmed', JSON.stringify(confirmed)); }
+// ---------------- Readable per-month reservation tab in Google Sheets ----------------
+// Mirrors the confirmed database into a normal spreadsheet table (one tab per month),
+// laid out the same way as the Greyroom sales sheet.
+const SALES_SHEET_HEADER = [
+  'S/L','Guest name','Property','Payment Gateway (optional note)','Platform',
+  'USD (Payoneer)','Cash','Saif Bkash','Handover (not sales)','Brac Bank',
+  'Payoneer BDT (ref)','Bkash Merchant','Guest Phone','Check-in','Check-out'
+];
+
+function buildSalesSheetRows(monthKey){
+  const mk = monthKey || currentMonth;
+  const list = sortByCheckin(confirmed.filter(c => c.month === mk));
+
+  // Handover is tracked separately and is not sales — pull it in by guest+property.
+  const handoverFor = (c) => handovers
+    .filter(h => h.month === mk
+      && (h.property || '') === (c.property || '')
+      && (h.guest || '').trim().toLowerCase() === (c.guest || '').trim().toLowerCase())
+    .reduce((s, h) => s + (parseFloat(h.amount) || 0), 0);
+
+  return list.map((c, i) => {
+    const amt = (c.amount === null || c.amount === undefined || c.amount === '') ? null : Number(c.amount);
+    const isUSD = c.currency === 'USD';
+    const gw = c.gateway || '';
+
+    let usd = '', cash = '', saif = '', brac = '', payoneerBdt = '', merchant = '';
+    if(gw === 'Payoneer'){
+      if(isUSD){ usd = amt; payoneerBdt = amt === null ? '' : Math.round(amt * USD_TO_BDT); }
+      else { payoneerBdt = amt; }
+    } else if(gw === 'Cash'){ cash = isUSD && amt !== null ? Math.round(amt * USD_TO_BDT) : amt; }
+    else if(gw === 'Saif Bkash'){ saif = isUSD && amt !== null ? Math.round(amt * USD_TO_BDT) : amt; }
+    else if(gw === 'Brac Bank'){ brac = isUSD && amt !== null ? Math.round(amt * USD_TO_BDT) : amt; }
+    else if(gw === 'Bkash Merchant'){ merchant = isUSD && amt !== null ? Math.round(amt * USD_TO_BDT) : amt; }
+
+    const ho = handoverFor(c);
+
+    return [
+      i + 1,
+      c.guest || '',
+      c.property || '',
+      gw,
+      c.platform || '',
+      usd === null ? '' : usd,
+      cash === null ? '' : cash,
+      saif === null ? '' : saif,
+      ho > 0 ? ho : '',
+      brac === null ? '' : brac,
+      payoneerBdt === null ? '' : payoneerBdt,
+      merchant === null ? '' : merchant,
+      c.contact || '',
+      c.checkin || '',
+      c.checkout || ''
+    ];
+  });
+}
+
+// Fire-and-forget: a sheet-tab failure must never block saving the actual data.
+async function syncMonthToSheet(monthKey){
+  if(typeof gasFetchWithRetry === 'undefined') return; // demo build has no backend
+  const mk = monthKey || currentMonth;
+  if(!mk) return;
+  try{
+    await gasFetchWithRetry(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'writeSheet',
+        sheet: mk,
+        title: `GREYROOM SALES — [${String(mk).toUpperCase()}]`,
+        header: SALES_SHEET_HEADER,
+        rows: buildSalesSheetRows(mk)
+      }),
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+    });
+  }catch(e){
+    console.error('Reservation tab sync failed for ' + mk, e);
+  }
+}
+
+async function saveConfirmed(){
+  await storageSet('greyroom:confirmed', JSON.stringify(confirmed));
+  syncMonthToSheet(currentMonth); // not awaited — the save itself is already done
+}
 async function saveExpenses(){ await storageSet('greyroom:expenses', JSON.stringify(expenses)); }
 async function saveHandovers(){ await storageSet('greyroom:handovers', JSON.stringify(handovers)); }
 async function saveHistoricalAnalysis(){ await storageSet('greyroom:historical-analysis', JSON.stringify(historicalAnalysis)); }
@@ -3588,6 +3678,26 @@ async function handleRestore(event){
   } finally {
     event.target.value = '';
   }
+}
+
+async function rebuildAllMonthSheets(){
+  const statusEl = document.getElementById('sheetSyncStatus');
+  if(typeof gasFetchWithRetry === 'undefined'){
+    statusEl.textContent = 'Not available in the demo build.';
+    return;
+  }
+  statusEl.style.color = '#8f897d';
+  statusEl.textContent = 'Rebuilding…';
+  let done = 0, failed = 0;
+  for(const m of months){
+    try{ await syncMonthToSheet(m); done++; }
+    catch(e){ failed++; }
+  }
+  statusEl.style.color = failed ? 'var(--red)' : 'var(--green)';
+  statusEl.textContent = failed
+    ? `Rebuilt ${done} tab(s), ${failed} failed — check your connection and try again.`
+    : `Rebuilt ${done} month tab(s) in Google Sheets.`;
+  if(done) logActivity(`rebuilt ${done} month tab(s) in the Google Sheet`);
 }
 
 // ---------------- Recover local data ----------------
