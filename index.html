@@ -103,6 +103,25 @@
   .prop-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
   .prop-tag{background:var(--ink);border:1px solid var(--line);border-radius:20px;padding:4px 10px;font-size:11.5px;color:#c9c3b5;display:flex;align-items:center;gap:6px;}
   .prop-tag button{background:none;border:none;color:#8a5a4a;cursor:pointer;font-size:13px;padding:0;line-height:1;}
+  .prop-tag button.rename{color:#9a958a;font-size:12px;}
+  .prop-tag button.rename:hover{color:var(--brass-bright);}
+  .prop-tag.editing{padding:2px 4px 2px 8px;gap:4px;}
+  .prop-tag.editing input{margin:0;padding:3px 6px;font-size:11.5px;width:150px;min-width:0;}
+  .prop-tag.editing button.save{background:var(--brass);color:var(--ink);border-radius:12px;padding:3px 8px;font-size:11px;font-weight:600;}
+  .prop-tag.editing button.cancel{color:#9a958a;padding:3px 4px;}
+  .bulk-preview{margin-top:10px;display:flex;flex-direction:column;gap:8px;}
+  .bulk-row{background:rgba(237,231,221,0.04);border:1px solid var(--line);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:6px;}
+  .bulk-row.new-prop{border-color:var(--brass);}
+  .bulk-row select,.bulk-row input{margin:0;padding:6px 8px;font-size:12.5px;min-width:0;}
+  .bulk-row .line{display:flex;gap:6px;align-items:center;}
+  .bulk-row .line .grow{flex:1;}
+  .bulk-row .line .qty{width:58px;flex:none;}
+  .bulk-row .line .amt{width:92px;flex:none;}
+  .bulk-row .line .cat{flex:1;}
+  .bulk-row .hint{font-size:10.5px;color:#8f897d;white-space:nowrap;}
+  .bulk-row .drop{background:none;border:none;color:#8a5a4a;cursor:pointer;font-size:16px;padding:0 2px;line-height:1;flex:none;}
+  .bulk-total{display:flex;justify-content:space-between;font-size:12.5px;color:#9a958a;padding:4px 2px 0;}
+  .bulk-total b{color:var(--brass-bright);}
   .add-prop-row{display:flex;gap:6px;margin-top:8px;}
   .add-prop-row input{flex:1;}
   .add-prop-row button{padding:0 12px;background:var(--brass);border:none;border-radius:6px;color:var(--ink);cursor:pointer;font-weight:600;}
@@ -349,11 +368,11 @@
         <button class="btn" onclick="addPending()">Add to pending queue</button>
 
         <details class="manage-props">
-          <summary>Manage properties</summary>
+          <summary>Manage properties (rename / add / remove)</summary>
           <div class="prop-tags" id="propTags"></div>
           <div class="add-prop-row">
             <input id="newPropInput" placeholder="Add property name">
-            <button onclick="addProperty()">Add</button>
+            <button onclick="addProperty('newPropInput')">Add</button>
           </div>
         </details>
         </div>
@@ -425,6 +444,19 @@
           You have view-only access. An admin or member can add expenses.
         </div>
         <div id="expenseFormContent">
+        <div style="background:var(--ink);border:1px dashed var(--line);border-radius:8px;padding:12px;margin-bottom:16px;">
+          <label style="margin-top:0;">Bulk paste — many expenses at once</label>
+          <textarea id="exBulkPaste" placeholder="Paste from WhatsApp, notes or Excel. Property name on its own line, then items below it — amount last, quantity optional:&#10;&#10;Aurora Residence&#10;Electric bill 3500&#10;Shampoo 12 pcs 1200&#10;Airfreshener x2 400&#10;&#10;Juliyet Residence&#10;Service charge 2000&#10;Harpic - 3 pcs - 450&#10;&#10;Or one per line: Urban Oasis - Toilet tissue 6 pcs 540" style="min-height:140px;font-size:13px;"></textarea>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+            <button class="btn" style="margin:0;flex:1;" onclick="previewBulkExpenses()">Read &amp; preview</button>
+            <button class="btn-ghost" style="margin:0;" onclick="clearBulkExpenses()">Clear</button>
+          </div>
+          <div id="exBulkStatus" style="font-size:11.5px;color:#8f897d;margin-top:8px;"></div>
+          <div id="exBulkPreview" class="bulk-preview" style="display:none;"></div>
+          <div id="exBulkActions" style="display:none;gap:8px;margin-top:10px;flex-wrap:wrap;">
+            <button class="btn" style="margin:0;flex:1;" onclick="commitBulkExpenses()">Add all to expense list</button>
+          </div>
+        </div>
         <label>Property</label>
         <select id="ex-property"></select>
         <div class="row2">
@@ -452,11 +484,24 @@
           <div><label id="ex-amount-label">Amount (BDT)</label><input id="ex-amount" type="number" min="0" step="0.01" placeholder="e.g. 3500" oninput="updateExpensePreview()"></div>
         </div>
         <div id="expenseConvertedPreview" style="font-size:11.5px;color:#8f897d;margin-top:-6px;"></div>
-        <label>Item / Description</label>
-        <input id="ex-item" placeholder="e.g. Electric Bill, Airfreshener, Service Charge">
+        <div class="row2">
+          <div><label>Item / Description</label>
+            <input id="ex-item" placeholder="e.g. Electric Bill, Airfreshener, Service Charge"></div>
+          <div><label>Qty (pcs)</label>
+            <input id="ex-qty" type="number" min="1" step="1" placeholder="1"></div>
+        </div>
         <label>Notes</label>
         <textarea id="ex-notes" placeholder="Any extra detail (optional)"></textarea>
         <button class="btn" onclick="addExpense()">Add expense</button>
+
+        <details class="manage-props">
+          <summary>Manage properties (rename / add / remove)</summary>
+          <div class="prop-tags" id="propTagsFin"></div>
+          <div class="add-prop-row">
+            <input id="newPropInputFin" placeholder="Add property name">
+            <button onclick="addProperty('newPropInputFin')">Add</button>
+          </div>
+        </details>
         </div>
       </div>
 
@@ -954,6 +999,7 @@ async function storageGet(key){
     return { key: data.key, value: data.value };
   }catch(e){
     console.error('Sheet get failed for ' + key, e);
+    try{ const m = localStorage.getItem(MIRROR_PREFIX + key); if(m) return { key, value: m }; }catch(_){}
     return null;
   }
 }
@@ -991,13 +1037,222 @@ function _flushWrites(){
     headers: { 'Content-Type': 'text/plain;charset=utf-8' }
   }).then(() => {
     setSyncStatus(true);
+    items.forEach(i => { mirrorSet(i.key, i.value); outboxRemove(i.key, i.value); });
     waiters.forEach(w => w.resolve({ ok: true }));
   }).catch(err => {
     console.error('Batched save failed', err);
     setSyncStatus(false);
-    showToast('Could not save — please try again');
+    // Keep the unsaved data on this device and retry automatically (see flushOutbox).
+    items.forEach(i => { mirrorSet(i.key, i.value); outboxAdd(i.key, i.value); });
+    showToast('No connection — saved on this device, will sync when back online');
     waiters.forEach(w => w.resolve(null));
   });
+}
+
+// ---------------- Multi-device sync & offline safety ----------------
+// Google Sheets (via Apps Script) is the shared source of truth for every device.
+// On top of that:
+//  • every key is mirrored to this browser's localStorage, so the app still opens with data when the sheet is unreachable
+//  • writes that fail are parked in an "outbox" and retried automatically (on reconnect, on the next pull, on next load)
+//  • list saves are merged with the server copy first, so two devices adding records at the same time never overwrite each other
+//  • the app pulls fresh data from the sheet periodically and whenever the tab regains focus, so other devices' changes show up
+const MIRROR_PREFIX = 'greyroom-mirror:';
+const OUTBOX_KEY = 'greyroom-outbox';
+const LIVE_SYNC_INTERVAL_MS = 45000;
+const LIST_KEYS = ['greyroom:pending', 'greyroom:confirmed', 'greyroom:expenses', 'greyroom:handovers'];
+const listGet = { 'greyroom:pending': () => pending, 'greyroom:confirmed': () => confirmed, 'greyroom:expenses': () => expenses, 'greyroom:handovers': () => handovers };
+const listSet = { 'greyroom:pending': v => { pending = v; }, 'greyroom:confirmed': v => { confirmed = v; }, 'greyroom:expenses': v => { expenses = v; }, 'greyroom:handovers': v => { handovers = v; } };
+let lastServerIds = {};   // key -> Set of record ids last seen on the server (lets us tell "deleted elsewhere" from "added here")
+let _pulling = false;
+let _liveSyncTimer = null;
+
+function mirrorSet(key, value){ try{ localStorage.setItem(MIRROR_PREFIX + key, value === null || value === undefined ? '' : String(value)); }catch(e){} }
+function mirrorGetAll(){
+  const out = {};
+  try{
+    for(let i = 0; i < localStorage.length; i++){
+      const k = localStorage.key(i);
+      if(k && k.startsWith(MIRROR_PREFIX)) out[k.slice(MIRROR_PREFIX.length)] = localStorage.getItem(k);
+    }
+  }catch(e){}
+  return out;
+}
+function outboxRead(){ try{ return JSON.parse(localStorage.getItem(OUTBOX_KEY) || '{}'); }catch(e){ return {}; } }
+function outboxWrite(o){ try{ if(Object.keys(o).length) localStorage.setItem(OUTBOX_KEY, JSON.stringify(o)); else localStorage.removeItem(OUTBOX_KEY); }catch(e){} }
+function outboxAdd(key, value){ const o = outboxRead(); o[key] = value; outboxWrite(o); }
+function outboxRemove(key, value){ const o = outboxRead(); if(o[key] !== undefined && o[key] === value) { delete o[key]; outboxWrite(o); } }
+function outboxSize(){ return Object.keys(outboxRead()).length; }
+
+// Re-send anything that failed to save earlier. Safe to call often.
+async function flushOutbox(){
+  const o = outboxRead();
+  const keys = Object.keys(o);
+  if(!keys.length) return 0;
+  const items = keys.map(key => ({ key, value: o[key] }));
+  try{
+    await gasFetchWithRetry(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'writeMany', items }),
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+    });
+    items.forEach(i => { outboxRemove(i.key, i.value); if(bulkCache) bulkCache[i.key] = i.value; });
+    setSyncStatus(true);
+    showToast(`Synced ${items.length} pending change(s) to the shared database`);
+    return items.length;
+  }catch(e){
+    console.warn('Outbox flush failed, will retry', e);
+    setSyncStatus(false);
+    return 0;
+  }
+}
+
+function idsOf(arr){ return new Set((Array.isArray(arr) ? arr : []).map(x => x && x.id).filter(Boolean)); }
+function parseList(str){ try{ const v = JSON.parse(str || '[]'); return Array.isArray(v) ? v : []; }catch(e){ return []; } }
+function rememberServerIds(key, str){ lastServerIds[key] = idsOf(parseList(str)); }
+
+// Combines this device's list with the server's current copy.
+//  - a record only on this device and never seen on the server  → added here, keep
+//  - a record only on the server and never seen here before      → added elsewhere, keep
+//  - a record we saw on the server before but is now gone there  → deleted elsewhere, drop
+//  - a record on the server that we saw before but no longer have → deleted here, drop
+//  - a record on both → keep whichever was edited more recently (this device wins a tie)
+function mergeList(local, remote, seen){
+  seen = seen || new Set();
+  const localIds = idsOf(local), remoteIds = idsOf(remote);
+  const remoteById = {}; remote.forEach(x => { if(x && x.id) remoteById[x.id] = x; });
+  const out = [];
+  local.forEach(x => {
+    if(!x || !x.id){ out.push(x); return; }
+    if(remoteIds.has(x.id)){
+      const r = remoteById[x.id];
+      const lt = x.editedAt || '', rt = r.editedAt || '';
+      out.push(rt > lt ? r : x);
+    } else if(!seen.has(x.id)){
+      out.push(x);
+    }
+  });
+  remote.forEach(x => {
+    if(!x || !x.id) return;
+    if(!localIds.has(x.id) && !seen.has(x.id)) out.push(x);
+  });
+  return out;
+}
+
+async function storageGetFresh(key){
+  const data = await gasFetchWithRetry(`${GAS_URL}?key=${encodeURIComponent(key)}&t=${Date.now()}`, { method: 'GET' });
+  if(data.value === null || data.value === undefined || data.value === '') return null;
+  return data.value;
+}
+
+// Saves a list key, first folding in whatever other devices have written since we last looked.
+async function saveListMerged(key){
+  let local = listGet[key]();
+  if(!lastServerIds[key]) lastServerIds[key] = idsOf(local);
+  try{
+    const fresh = await storageGetFresh(key);
+    const remote = parseList(fresh);
+    const merged = mergeList(local, remote, lastServerIds[key]);
+    if(JSON.stringify(merged) !== JSON.stringify(local)){
+      listSet[key](merged);
+      local = merged;
+      scheduleRerender();
+    }
+  }catch(e){
+    // Offline or the sheet is slow — save what we have; the outbox will retry if the write fails too.
+  }
+  lastServerIds[key] = idsOf(local);
+  return storageSet(key, JSON.stringify(local));
+}
+
+let _rerenderTimer = null;
+function scheduleRerender(){
+  clearTimeout(_rerenderTimer);
+  _rerenderTimer = setTimeout(() => {
+    try{ renderProperties(); renderMonthBar(); refreshAllTabsForMonth(); if(typeof renderPeople === 'function') renderPeople(); }catch(e){ console.error('Re-render after sync failed', e); }
+  }, 50);
+}
+
+// Pulls the latest copy of everything from the sheet and folds it into what's on screen.
+async function pullFromServer(reason){
+  if(_pulling || !session) return;
+  if(_writeQueue.size > 0) return; // a save is in flight — it will merge on its own
+  _pulling = true;
+  try{
+    if(outboxSize() > 0) await flushOutbox();
+    const all = await storageGetAll();
+    if(!all) return;
+    let changed = false;
+    const pushes = [];
+
+    LIST_KEYS.forEach(key => {
+      const remoteStr = all[key] || '';
+      const cachedStr = bulkCache ? (bulkCache[key] || '') : '';
+      mirrorSet(key, remoteStr);
+      if(remoteStr === cachedStr) return;
+      const remote = parseList(remoteStr);
+      const merged = mergeList(listGet[key](), remote, lastServerIds[key]);
+      listSet[key](merged);
+      lastServerIds[key] = idsOf(remote);
+      if(bulkCache) bulkCache[key] = remoteStr;
+      const mergedStr = JSON.stringify(merged);
+      if(mergedStr !== JSON.stringify(remote)){ pushes.push(key); }
+      changed = true;
+    });
+
+    const remoteProps = parseList(all['greyroom:properties']);
+    // Properties and months are saved the moment they change (and the outbox was flushed above),
+    // so when the server copy differs from what we last saw, the server copy is the newer one.
+    if(remoteProps.length && JSON.stringify(remoteProps) !== JSON.stringify(properties)){
+      properties = remoteProps;
+      if(bulkCache) bulkCache['greyroom:properties'] = all['greyroom:properties'];
+      changed = true;
+    }
+    const remoteMonths = parseList(all['greyroom:months']).map(normalizeMonthLabel);
+    if(remoteMonths.length && JSON.stringify(remoteMonths) !== JSON.stringify(months)){
+      months = remoteMonths;
+      if(!months.includes(currentMonth)) currentMonth = months[months.length - 1];
+      if(bulkCache) bulkCache['greyroom:months'] = all['greyroom:months'];
+      changed = true;
+    }
+    const histStr = all['greyroom:historical-analysis'] || '';
+    if(histStr && bulkCache && histStr !== (bulkCache['greyroom:historical-analysis'] || '')){
+      try{ historicalAnalysis = JSON.parse(histStr); bulkCache['greyroom:historical-analysis'] = histStr; changed = true; }catch(e){}
+    }
+    const accStr = all['greyroom:access-list'] || '';
+    if(accStr && bulkCache && accStr !== (bulkCache['greyroom:access-list'] || '')){
+      try{ accessList = JSON.parse(accStr); bulkCache['greyroom:access-list'] = accStr; changed = true; }catch(e){}
+    }
+    const logStr = all['greyroom:activity-log'] || '';
+    if(logStr && bulkCache && logStr !== (bulkCache['greyroom:activity-log'] || '')){
+      try{ activityLog = JSON.parse(logStr); bulkCache['greyroom:activity-log'] = logStr; if(typeof renderActivityLog === 'function') renderActivityLog(); }catch(e){}
+    }
+    Object.keys(all).forEach(k => mirrorSet(k, all[k]));
+
+    // Anything this device had that the server didn't → push it up now.
+    for(const key of pushes){
+      lastServerIds[key] = idsOf(listGet[key]());
+      await storageSet(key, JSON.stringify(listGet[key]()));
+    }
+
+    if(changed){
+      scheduleRerender();
+      if(reason !== 'silent') showToast('Updated with changes from other devices');
+    }
+    setSyncStatus(true);
+  }catch(e){
+    console.warn('Live sync pull failed', e);
+  }finally{
+    _pulling = false;
+  }
+}
+
+function startLiveSync(){
+  if(_liveSyncTimer) clearInterval(_liveSyncTimer);
+  _liveSyncTimer = setInterval(() => { if(!document.hidden) pullFromServer('silent'); }, LIVE_SYNC_INTERVAL_MS);
+  document.addEventListener('visibilitychange', () => { if(!document.hidden) pullFromServer(); });
+  window.addEventListener('focus', () => pullFromServer());
+  window.addEventListener('online', () => { flushOutbox().then(() => pullFromServer()); });
+  if(outboxSize() > 0) flushOutbox();
 }
 
 async function storageSet(key, value){
@@ -1027,7 +1282,18 @@ let bulkCache = null; // populated once at boot via storageGetAll() — avoids ~
 async function init(){
   bulkCache = await storageGetAll(); // one round trip fetches every key; null means the fetch genuinely failed
   const fetchFailed = bulkCache === null;
-  if(bulkCache === null) bulkCache = {}; // treat as empty so storageGet() falls back to individual fetches
+  if(bulkCache === null){
+    // Sheet unreachable — open with the copy this device saved last time, so nothing looks lost.
+    const mirror = mirrorGetAll();
+    bulkCache = Object.keys(mirror).length ? mirror : {};
+    if(Object.keys(mirror).length) console.warn('Storage unreachable — using the local mirror from the last successful sync');
+  } else {
+    Object.keys(bulkCache).forEach(k => mirrorSet(k, bulkCache[k]));
+  }
+  // Changes that never reached the sheet (saved while offline) take precedence until they are synced.
+  const outbox = outboxRead();
+  Object.keys(outbox).forEach(k => { bulkCache[k] = outbox[k]; });
+  if(Object.keys(outbox).length) flushOutbox();
 
   const res = await storageGet('greyroom:access-list');
 
@@ -1136,6 +1402,7 @@ async function enterApp(){
   document.getElementById('recalcPanel').style.display = session.role === 'admin' ? 'block' : 'none';
 
   await loadData();
+  startLiveSync();
 }
 
 // ---------------- Data ----------------
@@ -1203,6 +1470,12 @@ async function loadData(){
   const logRes = await storageGet('greyroom:activity-log');
   activityLog = logRes && logRes.value ? JSON.parse(logRes.value) : [];
 
+  // Remember what the server holds right now, so later saves can tell "added here" from "deleted elsewhere".
+  lastServerIds['greyroom:pending'] = idsOf(pending);
+  lastServerIds['greyroom:confirmed'] = idsOf(confirmed);
+  lastServerIds['greyroom:expenses'] = idsOf(expenses);
+  lastServerIds['greyroom:handovers'] = idsOf(handovers);
+
   renderProperties();
   renderMonthBar();
   renderPending();
@@ -1222,7 +1495,7 @@ async function loadData(){
 
 async function saveMonths(){ await storageSet('greyroom:months', JSON.stringify(months)); }
 
-async function savePending(){ await storageSet('greyroom:pending', JSON.stringify(pending)); }
+async function savePending(){ await saveListMerged('greyroom:pending'); }
 // ---------------- Readable per-month reservation tab in Google Sheets ----------------
 // Mirrors the confirmed database into a normal spreadsheet table (one tab per month),
 // laid out the same way as the Greyroom sales sheet.
@@ -1303,11 +1576,11 @@ function syncMonthToSheet(monthKey){
 }
 
 async function saveConfirmed(){
-  await storageSet('greyroom:confirmed', JSON.stringify(confirmed));
+  await saveListMerged('greyroom:confirmed');
   syncMonthToSheet(currentMonth); // not awaited — the save itself is already done
 }
-async function saveExpenses(){ await storageSet('greyroom:expenses', JSON.stringify(expenses)); }
-async function saveHandovers(){ await storageSet('greyroom:handovers', JSON.stringify(handovers)); }
+async function saveExpenses(){ await saveListMerged('greyroom:expenses'); }
+async function saveHandovers(){ await saveListMerged('greyroom:handovers'); }
 async function saveHistoricalAnalysis(){ await storageSet('greyroom:historical-analysis', JSON.stringify(historicalAnalysis)); }
 async function saveProperties(){ await storageSet('greyroom:properties', JSON.stringify(properties)); }
 async function saveAccessList(){ await storageSet('greyroom:access-list', JSON.stringify(accessList)); }
@@ -1790,28 +2063,129 @@ function switchTab(tab){
 }
 
 // ---------------- Properties ----------------
+// The property list is the single source of truth for every dropdown in the app
+// (booking form, expense form, bulk-paste preview, filters). Anything that adds,
+// renames or removes a property goes through here so all tabs stay in sync.
+let editingPropertyIndex = -1;
+
 function renderProperties(){
-  const sel = document.getElementById('f-property');
-  sel.innerHTML = properties.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
-  const exSel = document.getElementById('ex-property');
-  if(exSel) exSel.innerHTML = properties.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
-  const tags = document.getElementById('propTags');
-  tags.innerHTML = properties.map((p,i) => `<span class="prop-tag">${escapeHtml(p)} <button onclick="removeProperty(${i})">×</button></span>`).join('');
+  const fill = (id) => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    const keep = el.value;
+    el.innerHTML = properties.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
+    if(keep && properties.includes(keep)) el.value = keep;
+  };
+  fill('f-property');
+  fill('ex-property');
+
+  const tagHtml = properties.map((p,i) => {
+    if(i === editingPropertyIndex){
+      return `<span class="prop-tag editing">
+        <input class="propRenameInput" value="${escapeHtml(p)}" onkeydown="if(event.key==='Enter'){renameProperty(${i});} if(event.key==='Escape'){cancelRenameProperty();}">
+        <button class="save" onclick="renameProperty(${i})">Save</button>
+        <button class="cancel" onclick="cancelRenameProperty()">×</button>
+      </span>`;
+    }
+    return `<span class="prop-tag">${escapeHtml(p)} <button class="rename" title="Rename" onclick="startRenameProperty(${i})">✎</button><button title="Remove" onclick="removeProperty(${i})">×</button></span>`;
+  }).join('');
+  ['propTags','propTagsFin'].forEach(id => { const el = document.getElementById(id); if(el) el.innerHTML = tagHtml; });
+  if(editingPropertyIndex >= 0){
+    const inp = visibleRenameInput();
+    if(inp){ inp.focus(); inp.select(); }
+  }
 }
-async function addProperty(){
-  const input = document.getElementById('newPropInput');
+async function addProperty(inputId){
+  const input = document.getElementById(inputId || 'newPropInput');
   const val = input.value.trim();
   if(!val) return;
-  if(properties.includes(val)){ showToast('Already in the list'); return; }
+  if(properties.some(p => normalizeForMatch(p) === normalizeForMatch(val))){ showToast('Already in the list'); return; }
   properties.push(val); input.value = '';
   await saveProperties(); renderProperties();
   logActivity(`added property "${val}"`);
 }
 async function removeProperty(i){
   const val = properties[i];
+  const used = countPropertyUsage(val);
+  if(used > 0 && !confirm(`"${val}" is used in ${used} record(s). Removing it from the list keeps those records but the name will no longer appear in dropdowns. Continue?`)) return;
   properties.splice(i,1);
+  if(editingPropertyIndex === i) editingPropertyIndex = -1;
   await saveProperties(); renderProperties();
   logActivity(`removed property "${val}"`);
+}
+function countPropertyUsage(name){
+  const n = normalizeForMatch(name);
+  const hit = (arr) => arr.filter(x => normalizeForMatch(x.property) === n).length;
+  return hit(pending) + hit(confirmed) + hit(expenses) + hit(handovers);
+}
+// The tag list is rendered in both the Reservations and Financials panels; pick the input the user can actually see.
+function visibleRenameInput(){
+  const all = Array.from(document.querySelectorAll('.propRenameInput'));
+  return all.find(el => el.offsetParent !== null) || all[0] || null;
+}
+function startRenameProperty(i){ editingPropertyIndex = i; renderProperties(); }
+function cancelRenameProperty(){ editingPropertyIndex = -1; renderProperties(); }
+
+// Renames a property everywhere: the list, every pending/confirmed booking, every
+// expense, every handover, and the imported historical month-by-month tables.
+async function renameProperty(i){
+  const inp = visibleRenameInput();
+  const oldName = properties[i];
+  const newName = (inp ? inp.value : '').trim();
+  editingPropertyIndex = -1;
+  if(!newName || newName === oldName){ renderProperties(); return; }
+  if(properties.some((p,idx) => idx !== i && normalizeForMatch(p) === normalizeForMatch(newName))){
+    showToast('Another property already has that name'); renderProperties(); return;
+  }
+  const oldNorm = normalizeForMatch(oldName);
+  const stamp = new Date().toISOString();
+  const retag = (arr) => { let n = 0; arr.forEach(x => { if(normalizeForMatch(x.property) === oldNorm){ x.property = newName; x.editedAt = stamp; n++; } }); return n; };
+
+  properties[i] = newName;
+  const nPending = retag(pending), nConfirmed = retag(confirmed), nExpenses = retag(expenses), nHandovers = retag(handovers);
+
+  let histChanged = false;
+  ['sales','expense','revenue'].forEach(k => {
+    const table = historicalAnalysis[k] || {};
+    Object.keys(table).forEach(key => {
+      if(normalizeForMatch(key) === oldNorm && key !== newName){
+        table[newName] = table[key]; delete table[key]; histChanged = true;
+      }
+    });
+  });
+
+  await saveProperties();
+  if(nPending) await savePending();
+  if(nConfirmed) await saveConfirmed();
+  if(nExpenses) await saveExpenses();
+  if(nHandovers) await saveHandovers();
+  if(histChanged) await saveHistoricalAnalysis();
+
+  renderProperties();
+  renderPending(); renderConfirmed();
+  renderExpenseLog(); renderRequisitionList();
+  renderFinancialReports(); renderHandoverReport();
+  updateStats();
+  const total = nPending + nConfirmed + nExpenses + nHandovers;
+  showToast(`Renamed to "${newName}"${total ? ` — ${total} record(s) updated` : ''}`);
+  logActivity(`renamed property "${oldName}" → "${newName}" (${total} record(s) updated)`);
+}
+
+// Adds any property names that are not in the list yet (case/"The"-insensitive), returns the canonical names.
+async function ensureProperties(names){
+  const added = [];
+  names.forEach(raw => {
+    const v = String(raw || '').trim();
+    if(!v) return;
+    if(!properties.some(p => normalizeForMatch(p) === normalizeForMatch(v))){ properties.push(v); added.push(v); }
+  });
+  if(added.length){ await saveProperties(); renderProperties(); logActivity(`added propert${added.length===1?'y':'ies'} from bulk paste: ${added.join(', ')}`); }
+  return added;
+}
+function canonicalProperty(raw){
+  const norm = normalizeForMatch(raw);
+  if(!norm) return '';
+  return properties.find(p => normalizeForMatch(p) === norm) || String(raw).trim();
 }
 
 // ---------------- Pending / Confirmed ----------------
@@ -2585,13 +2959,15 @@ async function addExpense(){
   const currency = document.getElementById('ex-currency').value;
   const amount = document.getElementById('ex-amount').value;
   const item = document.getElementById('ex-item').value.trim();
+  const qtyRaw = parseInt(document.getElementById('ex-qty').value, 10);
+  const qty = qtyRaw > 0 ? qtyRaw : undefined; // blank = read "12 pcs" from the item text if present
   const notes = document.getElementById('ex-notes').value.trim();
 
   if(!amount || isNaN(parseFloat(amount))){ showToast('Enter a valid amount'); return; }
 
   const entry = {
     id: uid(), property, category, date, currency, amount, month: currentMonth,
-    item: item || category, notes, addedBy: session.name, addedAt: new Date().toISOString()
+    item: item || category, qty, notes, addedBy: session.name, addedAt: new Date().toISOString()
   };
   expenses.unshift(entry);
   await saveExpenses();
@@ -2600,6 +2976,7 @@ async function addExpense(){
   renderFinancialReports();
   document.getElementById('ex-amount').value = '';
   document.getElementById('ex-item').value = '';
+  document.getElementById('ex-qty').value = '';
   document.getElementById('ex-notes').value = '';
   document.getElementById('ex-date').value = '';
   showToast('Expense logged');
@@ -2625,6 +3002,243 @@ function parseQtyAndBaseItem(itemText){
   }
   return { baseItem: text || 'Unspecified', qty: 1 };
 }
+// Newer entries carry an explicit qty; older ones (and Excel imports) keep it inside the item text ("Shampoo - 12 pcs").
+function expenseItemQty(e){
+  const parsed = parseQtyAndBaseItem(e.item || e.category);
+  const explicit = parseInt(e.qty, 10);
+  return explicit > 0 ? { baseItem: parsed.baseItem, qty: explicit } : parsed;
+}
+
+// ---------------- Bulk expense paste ----------------
+// Turns loosely formatted text into expense rows. Understands:
+//   Aurora Residence            <- a line matching (or naming) a property switches the current property
+//   Electric bill 3500          <- last number on the line is the amount
+//   Shampoo 12 pcs 1200         <- "12 pcs", "x2", "2 pieces", "qty 3", "3 nos" set the quantity
+//   Urban Oasis - Harpic 3 pcs 450   <- property inline, separated by "-", ":" or "|"
+//   Shampoo<TAB>12<TAB>1200     <- copied from Excel: last number = amount, earlier small integer = qty
+//   Date: 05.09.26              <- sets the date for the lines that follow
+const QTY_RE = /(?:\b(?:x|qty\.?|quantity)\s*[:=]?\s*(\d+)\b|\b(\d+)\s*(?:pcs?|pc|pieces?|piece|nos?|units?|pkts?|packets?|bottles?|btl|boxes?|box|kg|ltr|litres?|liters?|dozen)\b\.?|\bx\s*(\d+)\b)/i;
+const AMOUNT_TAIL_RE = /(?:^|[\s\-–—:=|,(])(?:(?:bdt|tk|taka|৳|rs\.?|\$|usd)\s*)?(\d{1,3}(?:,\d{2,3})+|\d+)(?:\.(\d{1,2}))?\s*(?:\/-|\/=|tk|taka|bdt|৳|usd|\$|only)?\s*\)?\s*$/i;
+
+function parseAmountToken(str){
+  return parseFloat(String(str).replace(/,/g, ''));
+}
+
+function parseExpenseLine(line, ctx){
+  const raw = stripInvisible(line).replace(/\s+/g, ' ').trim();
+  if(!raw) return null;
+
+  // Date lines apply to everything that follows
+  const dateM = raw.match(/^(?:date|tarikh)\s*[:\-]?\s*(.+)$/i);
+  if(dateM){ const d = parseLooseDate(dateM[1]); if(d){ ctx.date = d; return { kind: 'date', date: d }; } }
+  const bareDate = /^\d{1,2}[.\/\-]\d{1,2}[.\/\-]\d{2,4}$/.test(raw) ? parseLooseDate(raw) : '';
+  if(bareDate){ ctx.date = bareDate; return { kind: 'date', date: bareDate }; }
+
+  // Tab / multi-space separated cells (Excel copy)
+  const origLine = stripInvisible(line);
+  let cells = origLine.includes('\t') ? origLine.split('\t').map(s => s.trim()).filter(Boolean) : null;
+  if(!cells && /\s{2,}/.test(line)) cells = line.trim().split(/\s{2,}/).map(s => s.trim()).filter(Boolean);
+
+  let property = '', item = '', qty = null, amount = null, currency = 'BDT';
+  if(/\$|\busd\b|dollar/i.test(raw)) currency = 'USD';
+
+  if(cells && cells.length >= 2){
+    const nums = [], texts = [];
+    cells.forEach(c => {
+      const q = c.match(QTY_RE);
+      const asNum = c.replace(/[,\s]/g, '').replace(/^(bdt|tk|৳|\$)/i, '').replace(/(tk|bdt|৳|\/-)$/i, '');
+      if(/^\d+(\.\d+)?$/.test(asNum)) nums.push(parseFloat(asNum));
+      else if(q && c.replace(QTY_RE, '').trim() === ''){ qty = parseInt(q[1] || q[2] || q[3], 10); }
+      else texts.push(c);
+    });
+    if(nums.length){ amount = nums[nums.length - 1]; if(nums.length >= 2 && qty === null && Number.isInteger(nums[0]) && nums[0] < 1000) qty = nums[0]; }
+    // The text cell that matches a property becomes the property; the rest is the item.
+    texts.forEach(t => {
+      if(!property && findPropertyInText(t, true)) property = findPropertyInText(t, true);
+      else item = item ? `${item} ${t}` : t;
+    });
+    if(!property && texts.length >= 2){ property = texts[0]; item = texts.slice(1).join(' '); }
+    if(item){
+      const q = item.match(QTY_RE);
+      if(q){ if(qty === null) qty = parseInt(q[1] || q[2] || q[3], 10); item = item.replace(QTY_RE, ' '); }
+    }
+  } else {
+    let rest = raw;
+    // Strip trailing "EXPENSE" headers: "AURORA EXPENSE"
+    const headerM = rest.match(/^(.+?)\s*expenses?\s*:?$/i);
+    const amtM = rest.match(AMOUNT_TAIL_RE);
+    if(amtM){
+      amount = parseAmountToken(amtM[1] + (amtM[2] ? '.' + amtM[2] : ''));
+      rest = rest.slice(0, amtM.index).trim();
+    }
+    const q = rest.match(QTY_RE);
+    if(q){ qty = parseInt(q[1] || q[2] || q[3], 10); rest = rest.replace(QTY_RE, ' '); }
+    rest = rest.replace(/\s+/g, ' ').replace(/[\s\-–—:=|,]+$/, '').trim();
+
+    if(amount === null){
+      // No amount → this is a property header (known property, "<NAME> EXPENSE", or a short unknown name)
+      const hdr = headerM ? headerM[1].trim() : rest;
+      const known = findPropertyInText(hdr, true);
+      if(known) return { kind: 'property', property: known };
+      if(headerM || (hdr.split(' ').length <= 4 && !/\d/.test(hdr))) return { kind: 'property', property: hdr };
+      return { kind: 'skip', text: raw };
+    }
+
+    // Inline property: "Urban Oasis - Harpic 3 pcs" or "Aurora: Electric bill"
+    const parts = rest.split(/\s*(?:\s[-–—|]\s|:\s|\s\|\s)\s*/).map(s => s.trim()).filter(Boolean);
+    if(parts.length >= 2){
+      const hit = findPropertyInText(parts[0], true);
+      if(hit){ property = hit; item = parts.slice(1).join(' - '); }
+      else { const hit2 = findPropertyInText(parts[parts.length-1], true); if(hit2){ property = hit2; item = parts.slice(0,-1).join(' - '); } }
+    }
+    if(!item){
+      const hit = findPropertyInText(rest, false);
+      if(hit){
+        property = hit.name;
+        item = rest.replace(hit.match, ' ').replace(/^[\s\-–—:|,]+|[\s\-–—:|,]+$/g, '').replace(/\s+/g, ' ').trim();
+      } else item = rest;
+    }
+  }
+
+  item = String(item || '').replace(/^[\s\-–—:|,]+|[\s\-–—:|,]+$/g, '').replace(/\s+/g, ' ').trim();
+  if(amount === null || isNaN(amount)) return { kind: 'skip', text: raw };
+  return {
+    kind: 'item',
+    property: property || ctx.property || '',
+    item: item || 'Unspecified',
+    qty: qty && qty > 0 ? qty : 1,
+    amount, currency,
+    date: ctx.date || ''
+  };
+}
+
+// exact=true → whole text must be a property name (ignoring "The", case, spacing) and returns the name.
+// exact=false → finds a property name anywhere in the text and returns { name, match }.
+function findPropertyInText(text, exact){
+  const norm = normalizeForMatch(text);
+  if(!norm) return exact ? '' : null;
+  if(exact){
+    const hit = properties.find(p => normalizeForMatch(p) === norm);
+    if(hit) return hit;
+    // Single-word shorthand: "Aurora" → "Aurora Residence", "Vantage" → "Shanta Vantage"
+    if(!/\s/.test(norm) && norm.length >= 4){
+      const cands = properties.filter(p => normalizeForMatch(p).split(' ').includes(norm));
+      if(cands.length === 1) return cands[0];
+    }
+    return '';
+  }
+  const lower = ' ' + norm + ' ';
+  const sorted = [...properties].sort((a,b) => b.length - a.length);
+  for(const p of sorted){
+    const pn = normalizeForMatch(p);
+    const idx = lower.indexOf(' ' + pn + ' ');
+    if(idx !== -1){
+      const re = new RegExp('(?:the\\s+)?' + pn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+'), 'i');
+      const m = String(text).match(re);
+      return { name: p, match: m ? m[0] : p };
+    }
+  }
+  return null;
+}
+
+function parseBulkExpenses(text){
+  const ctx = { property: '', date: document.getElementById('ex-date').value || '' };
+  const rows = [], skipped = [];
+  const lines = String(text || '').split(/\r?\n/);
+  let lastWasBlank = true;
+  lines.forEach(line => {
+    if(!line.trim()){ lastWasBlank = true; return; }
+    const r = parseExpenseLine(line, ctx);
+    lastWasBlank = false;
+    if(!r) return;
+    if(r.kind === 'property'){ ctx.property = canonicalProperty(r.property); return; }
+    if(r.kind === 'date') return;
+    if(r.kind === 'skip'){ skipped.push(r.text); return; }
+    r.property = canonicalProperty(r.property) || ctx.property || document.getElementById('ex-property').value || '';
+    r.category = categorizeExpenseItem(r.item);
+    rows.push(r);
+  });
+  return { rows, skipped };
+}
+
+let bulkExpenseRows = [];
+function previewBulkExpenses(){
+  const statusEl = document.getElementById('exBulkStatus');
+  const raw = document.getElementById('exBulkPaste').value;
+  if(!raw.trim()){ statusEl.textContent = 'Paste some expense lines first.'; return; }
+  const { rows, skipped } = parseBulkExpenses(raw);
+  bulkExpenseRows = rows;
+  renderBulkPreview();
+  const newProps = Array.from(new Set(rows.map(r => r.property).filter(p => p && !properties.includes(p))));
+  const bits = [`${rows.length} expense line(s) found`];
+  if(newProps.length) bits.push(`${newProps.length} new propert${newProps.length===1?'y':'ies'} will be added: ${newProps.join(', ')}`);
+  if(skipped.length) bits.push(`${skipped.length} line(s) had no amount and were ignored: ${skipped.slice(0,3).map(s => `"${s}"`).join(', ')}${skipped.length>3?'…':''}`);
+  statusEl.textContent = rows.length ? bits.join(' · ') : 'No lines with an amount were found — each expense line needs a number at the end (e.g. "Electric bill 3500").';
+}
+
+function renderBulkPreview(){
+  const wrap = document.getElementById('exBulkPreview');
+  const actions = document.getElementById('exBulkActions');
+  if(!bulkExpenseRows.length){ wrap.style.display = 'none'; actions.style.display = 'none'; wrap.innerHTML = ''; return; }
+  const cats = [...document.getElementById('ex-category').options].map(o => o.value);
+  const propOptions = (sel) => {
+    const list = properties.slice();
+    if(sel && !list.includes(sel)) list.push(sel);
+    return list.map(p => `<option value="${escapeHtml(p)}"${p===sel?' selected':''}>${escapeHtml(p)}${properties.includes(p)?'':' (new)'}</option>`).join('')
+      + `<option value=""${!sel?' selected':''}>— choose property —</option>`;
+  };
+  const total = bulkExpenseRows.reduce((s,r) => s + toBdtNumber(r.amount, r.currency), 0);
+  wrap.innerHTML = bulkExpenseRows.map((r,i) => `<div class="bulk-row ${r.property && !properties.includes(r.property) ? 'new-prop' : ''}">
+      <div class="line">
+        <select class="grow" onchange="bulkExpenseRows[${i}].property=this.value;this.closest('.bulk-row').classList.toggle('new-prop', !!this.value && !properties.includes(this.value))">${propOptions(r.property)}</select>
+        <button class="drop" title="Drop this line" onclick="bulkExpenseRows.splice(${i},1);renderBulkPreview()">×</button>
+      </div>
+      <div class="line">
+        <input class="grow" value="${escapeHtml(r.item)}" placeholder="Item" oninput="bulkExpenseRows[${i}].item=this.value;bulkExpenseRows[${i}].category=categorizeExpenseItem(this.value)">
+      </div>
+      <div class="line">
+        <select class="cat" onchange="bulkExpenseRows[${i}].category=this.value">${cats.map(c => `<option${c===r.category?' selected':''}>${escapeHtml(c)}</option>`).join('')}</select>
+        <input class="qty" type="number" min="1" step="1" value="${r.qty}" title="Qty (pcs)" oninput="bulkExpenseRows[${i}].qty=parseInt(this.value,10)||1">
+        <span class="hint">pcs</span>
+        <input class="amt" type="number" min="0" step="0.01" value="${r.amount}" title="Amount" oninput="bulkExpenseRows[${i}].amount=parseFloat(this.value)||0">
+        <span class="hint">${r.currency}</span>
+      </div>
+      ${r.date ? `<div class="hint">Date: ${escapeHtml(r.date)}</div>` : ''}
+    </div>`).join('')
+    + `<div class="bulk-total"><span>${bulkExpenseRows.length} line(s)</span><span>Total <b>BDT ${Math.round(total).toLocaleString('en-IN')}</b></span></div>`;
+  wrap.style.display = 'flex';
+  actions.style.display = 'flex';
+}
+
+function clearBulkExpenses(){
+  document.getElementById('exBulkPaste').value = '';
+  document.getElementById('exBulkStatus').textContent = '';
+  bulkExpenseRows = [];
+  renderBulkPreview();
+}
+
+async function commitBulkExpenses(){
+  const rows = bulkExpenseRows.filter(r => r.amount > 0);
+  if(!rows.length){ showToast('Nothing to add'); return; }
+  const missing = rows.filter(r => !r.property);
+  if(missing.length){ showToast(`${missing.length} line(s) have no property — pick one in the preview`); return; }
+
+  await ensureProperties(rows.map(r => r.property));
+  const entries = rows.map(r => ({
+    id: uid(), property: canonicalProperty(r.property), category: r.category || categorizeExpenseItem(r.item),
+    date: r.date || '', currency: r.currency || 'BDT', amount: String(r.amount), month: currentMonth,
+    item: r.item || r.category, qty: r.qty > 0 ? r.qty : 1,
+    notes: 'Added via bulk paste', addedBy: session.name, addedAt: new Date().toISOString()
+  }));
+  expenses = [...entries, ...expenses];
+  await saveExpenses();
+  renderExpenseLog(); renderRequisitionList(); renderFinancialReports(); updateStats();
+  const props = new Set(entries.map(e => e.property));
+  const total = entries.reduce((s,e) => s + toBdtNumber(e.amount, e.currency), 0);
+  clearBulkExpenses();
+  showToast(`${entries.length} expense(s) added across ${props.size} propert${props.size===1?'y':'ies'}`);
+  logActivity(`bulk-added ${entries.length} expense(s) totalling BDT ${Math.round(total).toLocaleString('en-IN')} across ${Array.from(props).join(', ')}`);
+}
 
 function populateExpenseLogFilter(){
   const sel = document.getElementById('expenseLogFilter');
@@ -2640,7 +3254,7 @@ function computeMonthlyRequisition(){
   const monthScoped = expenses.filter(e => e.month === currentMonth);
   const groups = {}; // key -> { label, category, qty, amount, properties:Set }
   monthScoped.forEach(e => {
-    const { baseItem, qty } = parseQtyAndBaseItem(e.item || e.category);
+    const { baseItem, qty } = expenseItemQty(e);
     const key = baseItem.toLowerCase();
     if(!groups[key]) groups[key] = { label: baseItem, category: e.category || 'Other', qty: 0, amount: 0, properties: new Set() };
     groups[key].qty += qty;
@@ -2686,7 +3300,7 @@ function computeExpenseLogGrouped(){
 
   const groups = {}; // baseItemLower -> { label, qty, amount, properties:Set, ids:[] }
   scoped.forEach(e => {
-    const { baseItem, qty } = parseQtyAndBaseItem(e.item || e.category);
+    const { baseItem, qty } = expenseItemQty(e);
     const key = baseItem.toLowerCase();
     if(!groups[key]) groups[key] = { label: baseItem, qty: 0, amount: 0, properties: new Set(), ids: [] };
     groups[key].qty += qty;
