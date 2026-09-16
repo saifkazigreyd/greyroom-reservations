@@ -557,7 +557,7 @@
           </select>
           <div class="table-wrap" style="margin-top:12px;">
             <table class="db-table">
-              <thead><tr><th>Item</th><th>Qty (pcs)</th><th>Total Amount (BDT)</th><th>Property</th><th></th></tr></thead>
+              <thead><tr><th>Date</th><th>Item</th><th>Category</th><th>Amount (BDT)</th><th>Property</th><th></th></tr></thead>
               <tbody id="expenseBody"></tbody>
             </table>
           </div>
@@ -840,6 +840,46 @@
       <button class="btn-ghost" onclick="closeEditBooking()">Cancel</button>
     </div>
     <div id="editStatus" style="font-size:11.5px;color:var(--red);margin-top:10px;"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="editExpenseOverlay" style="display:none;">
+  <div class="modal-card">
+    <h2>Edit expense</h2>
+    <div class="modal-sub" id="editExpenseSub"></div>
+
+    <label>Property</label>
+    <select id="eex-property"></select>
+
+    <div class="row2">
+      <div><label>Category</label><select id="eex-category"></select></div>
+      <div><label>Date</label><input id="eex-date" type="date"></div>
+    </div>
+
+    <div class="row2">
+      <div><label>Currency</label>
+        <select id="eex-currency" onchange="updateEditExpensePreview()">
+          <option value="BDT">BDT</option>
+          <option value="USD">USD ($)</option>
+        </select>
+      </div>
+      <div><label id="eex-amount-label">Amount (BDT)</label>
+        <input id="eex-amount" type="number" min="0" step="0.01" oninput="updateEditExpensePreview()">
+      </div>
+    </div>
+    <div id="editExpenseConvertedPreview" style="font-size:11.5px;color:#8f897d;margin-top:-6px;"></div>
+
+    <label>Item / Description</label>
+    <input id="eex-item" placeholder="e.g. Electric Bill">
+
+    <label>Notes</label>
+    <textarea id="eex-notes" placeholder="Any extra detail (optional)"></textarea>
+
+    <div class="modal-actions">
+      <button class="btn" onclick="saveEditExpense()">Save changes</button>
+      <button class="btn-ghost" onclick="closeEditExpense()">Cancel</button>
+    </div>
+    <div id="editExpenseStatus" style="font-size:11.5px;color:var(--red);margin-top:10px;"></div>
   </div>
 </div>
 
@@ -3292,24 +3332,16 @@ function renderRequisitionList(){
   }).join('');
 }
 
-function computeExpenseLogGrouped(){
+function computeExpenseLogRows(){
   const filterEl = document.getElementById('expenseLogFilter');
   const filter = filterEl ? filterEl.value : '__all__';
   const monthScoped = expenses.filter(e => e.month === currentMonth);
   const scoped = filter === '__all__' ? monthScoped : monthScoped.filter(e => (e.property || 'Unspecified') === filter);
-
-  const groups = {}; // baseItemLower -> { label, qty, amount, properties:Set, ids:[] }
-  scoped.forEach(e => {
-    const { baseItem, qty } = expenseItemQty(e);
-    const key = baseItem.toLowerCase();
-    if(!groups[key]) groups[key] = { label: baseItem, qty: 0, amount: 0, properties: new Set(), ids: [] };
-    groups[key].qty += qty;
-    groups[key].amount += toBdtNumber(e.amount, e.currency);
-    groups[key].properties.add(e.property || 'Unspecified');
-    groups[key].ids.push(e.id);
+  return scoped.slice().sort((a, b) => {
+    const da = a.date || '', db = b.date || '';
+    if(da !== db) return da < db ? -1 : 1;
+    return (a.item || '').localeCompare(b.item || '');
   });
-
-  return Object.values(groups).sort((a,b) => a.label.localeCompare(b.label));
 }
 
 function renderExpenseLog(){
@@ -3317,28 +3349,109 @@ function renderExpenseLog(){
   const body = document.getElementById('expenseBody');
   const emptyEl = document.getElementById('expenseEmpty');
   if(!body) return;
-  const groups = computeExpenseLogGrouped();
-  if(groups.length === 0){
+  const rows = computeExpenseLogRows();
+  if(rows.length === 0){
     body.innerHTML = '';
     emptyEl.style.display = 'block';
     return;
   }
   emptyEl.style.display = 'none';
-  body.innerHTML = groups.map(g => {
-    const propsArr = Array.from(g.properties);
-    const propLabel = propsArr.length === 1 ? escapeHtml(propsArr[0]) : `Multiple (${propsArr.length})`;
-    const isMatched = g.ids.length > 1;
-    const removeBtn = (!isViewer && !isMatched)
-      ? `<button class="btn-ghost" style="margin:0;padding:5px 10px;font-size:11px;" onclick="removeExpense('${g.ids[0]}')">Remove</button>`
-      : '';
+  body.innerHTML = rows.map(e => {
+    const actions = isViewer ? '' : `
+      <button class="btn-ghost" style="margin:0;padding:5px 10px;font-size:11px;" onclick="openEditExpense('${e.id}')">Edit</button>
+      <button class="btn-ghost" style="margin:0;padding:5px 10px;font-size:11px;" onclick="removeExpense('${e.id}')">Remove</button>`;
     return `<tr>
-      <td>${escapeHtml(g.label)}</td>
-      <td>${g.qty}</td>
-      <td>BDT ${Math.round(g.amount).toLocaleString('en-IN')}</td>
-      <td>${propLabel}</td>
-      <td>${removeBtn}</td>
+      <td>${e.date ? fmtDate(e.date) : '—'}</td>
+      <td>${escapeHtml(e.item || e.category || '')}</td>
+      <td>${escapeHtml(e.category || '')}</td>
+      <td>${fmtBdtEquivalent(e.amount, e.currency)}</td>
+      <td>${escapeHtml(e.property || 'Unspecified')}</td>
+      <td style="white-space:nowrap;">${actions}</td>
     </tr>`;
   }).join('');
+}
+
+// ---------------- Edit an existing expense ----------------
+let editingExpenseId = null;
+
+function updateEditExpensePreview(){
+  const cur = document.getElementById('eex-currency').value;
+  document.getElementById('eex-amount-label').textContent = cur === 'USD' ? 'Amount (USD $)' : 'Amount (BDT)';
+  const amt = parseFloat(document.getElementById('eex-amount').value);
+  const prev = document.getElementById('editExpenseConvertedPreview');
+  prev.textContent = (cur === 'USD' && !isNaN(amt))
+    ? '≈ BDT ' + Math.round(amt * USD_TO_BDT).toLocaleString('en-IN') + ' (at ' + USD_TO_BDT + '/USD)'
+    : '';
+}
+
+function openEditExpense(id){
+  if(isViewer){ showToast('View-only access'); return; }
+  const entry = expenses.find(e => e.id === id);
+  if(!entry){ showToast('Could not find that expense'); return; }
+
+  editingExpenseId = id;
+
+  const propSel = document.getElementById('eex-property');
+  const propOpts = properties.slice();
+  if(entry.property && !propOpts.includes(entry.property)) propOpts.unshift(entry.property);
+  propSel.innerHTML = propOpts.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
+  propSel.value = entry.property || propOpts[0] || '';
+
+  const catSel = document.getElementById('eex-category');
+  const catOpts = categories.slice();
+  if(entry.category && !catOpts.includes(entry.category)) catOpts.unshift(entry.category);
+  catSel.innerHTML = catOpts.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  catSel.value = entry.category || catOpts[0] || '';
+
+  document.getElementById('eex-date').value = entry.date || '';
+  document.getElementById('eex-currency').value = entry.currency || 'BDT';
+  document.getElementById('eex-amount').value = (entry.amount === null || entry.amount === undefined) ? '' : entry.amount;
+  document.getElementById('eex-item').value = entry.item || '';
+  document.getElementById('eex-notes').value = entry.notes || '';
+
+  document.getElementById('editExpenseSub').textContent = `${entry.item || entry.category || 'Expense'} · ${entry.month || currentMonth}`;
+  document.getElementById('editExpenseStatus').textContent = '';
+  updateEditExpensePreview();
+  document.getElementById('editExpenseOverlay').style.display = 'flex';
+}
+
+function closeEditExpense(){
+  document.getElementById('editExpenseOverlay').style.display = 'none';
+  editingExpenseId = null;
+}
+
+async function saveEditExpense(){
+  if(isViewer){ showToast('View-only access'); return; }
+  const statusEl = document.getElementById('editExpenseStatus');
+  const entry = expenses.find(e => e.id === editingExpenseId);
+  if(!entry){ statusEl.textContent = 'That expense no longer exists.'; return; }
+
+  const rawAmount = document.getElementById('eex-amount').value;
+  if(rawAmount !== '' && isNaN(parseFloat(rawAmount))){
+    statusEl.textContent = 'Amount must be a number, or left blank.';
+    return;
+  }
+  const item = document.getElementById('eex-item').value.trim();
+  const category = document.getElementById('eex-category').value;
+
+  entry.property = document.getElementById('eex-property').value;
+  entry.category = category;
+  entry.date = document.getElementById('eex-date').value;
+  entry.currency = document.getElementById('eex-currency').value;
+  entry.amount = rawAmount === '' ? null : parseFloat(rawAmount);
+  entry.item = item || category;
+  entry.notes = document.getElementById('eex-notes').value.trim();
+  entry.editedBy = session.name;
+  entry.editedAt = new Date().toISOString();
+
+  await saveExpenses();
+  renderExpenseLog();
+  renderRequisitionList();
+  renderFinancialReports();
+
+  closeEditExpense();
+  showToast('Expense updated');
+  logActivity(`edited an expense (${entry.item}) for ${entry.property}`);
 }
 
 // ---------------- Statistics tab ----------------
