@@ -982,10 +982,20 @@ function jsAttrEscape(s){
   if(s===undefined||s===null) return '';
   return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
 }
-async function logActivity(action){
+// Activity log writes are deferred and folded into the next save batch, so logging never
+// costs the user an extra round trip to the sheet.
+let _activityTimer = null;
+function flushActivityLog(){
+  clearTimeout(_activityTimer);
+  _activityTimer = null;
+  storageSet('greyroom:activity-log', JSON.stringify(activityLog));
+}
+function logActivity(action){
   activityLog.unshift({ id: uid(), ts: new Date().toISOString(), who: session ? session.name : 'system', action });
   activityLog = activityLog.slice(0, 200);
-  await storageSet('greyroom:activity-log', JSON.stringify(activityLog));
+  clearTimeout(_activityTimer);
+  _activityTimer = setTimeout(flushActivityLog, 1200);
+  return Promise.resolve();
 }
 
 // ---------------- Storage backend: Google Sheets via Apps Script Web App ----------------
@@ -995,10 +1005,18 @@ async function logActivity(action){
 // storageSet interface, so nothing else in the app needed to change.
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbx08-ncLlcw9Fx1CELguXoDxiYo2coXsrVetygJ4letflHO80SmuSAWZ_JZk1nJ9Mgk8w/exec';
 
+function syncBusy(){
+  return (typeof _listDirty !== 'undefined' && (_listDirty.size > 0 || _listSyncing))
+    || _writeQueue.size > 0 || _writesInFlight > 0;
+}
 function setSyncStatus(ok){
   const el = document.getElementById('syncStatus');
   if(!el) return;
-  if(ok){
+  if(ok === true && syncBusy()) ok = 'saving';
+  if(ok === 'saving'){
+    el.textContent = '⟳ Saving…';
+    el.style.color = 'var(--brass-bright)';
+  } else if(ok){
     el.textContent = '✓ Saved';
     el.style.color = 'var(--green)';
   } else {
@@ -1028,7 +1046,9 @@ async function gasFetchWithRetry(url, options, attempts = 3){
 
 async function storageGet(key){
   // Prefer the bulk cache from the initial page load — avoids an extra round trip.
-  if(bulkCache && Object.prototype.hasOwnProperty.call(bulkCache, key)){
+  // The bulk load returns every key the sheet has, so a key missing from it simply doesn't
+  // exist yet — no need to ask the sheet again one key at a time (that used to stall start-up).
+  if(bulkCache && (_bulkComplete || Object.prototype.hasOwnProperty.call(bulkCache, key))){
     const v = bulkCache[key];
     if(v === null || v === undefined || v === '') return null;
     return { key, value: v };
@@ -1060,6 +1080,7 @@ async function storageGetAll(){
 let _writeQueue = new Map();   // key -> value (latest wins)
 let _writeTimer = null;
 let _writeWaiters = [];
+let _writesInFlight = 0;
 
 function _flushWrites(){
   const items = Array.from(_writeQueue, ([key, value]) => ({ key, value }));
@@ -1069,6 +1090,7 @@ function _flushWrites(){
   _writeTimer = null;
   if(items.length === 0){ waiters.forEach(w => w.resolve(null)); return; }
 
+  _writesInFlight++;
   gasFetchWithRetry(GAS_URL, {
     method: 'POST',
     body: JSON.stringify(items.length === 1
@@ -1076,16 +1098,20 @@ function _flushWrites(){
       : { action: 'writeMany', items }),
     headers: { 'Content-Type': 'text/plain;charset=utf-8' }
   }).then(() => {
-    setSyncStatus(true);
+    _writesInFlight--;
     items.forEach(i => { mirrorSet(i.key, i.value); outboxRemove(i.key, i.value); });
     waiters.forEach(w => w.resolve({ ok: true }));
+    setSyncStatus(true);
   }).catch(err => {
+    _writesInFlight--;
     console.error('Batched save failed', err);
-    setSyncStatus(false);
     // Keep the unsaved data on this device and retry automatically (see flushOutbox).
-    items.forEach(i => { mirrorSet(i.key, i.value); outboxAdd(i.key, i.value); });
+    // (Not written to the mirror: the mirror only ever holds what the server confirmed,
+    // so the next merge can still tell "added here" from "deleted elsewhere".)
+    items.forEach(i => { outboxAdd(i.key, i.value); });
     showToast('No connection — saved on this device, will sync when back online');
     waiters.forEach(w => w.resolve(null));
+    setSyncStatus(false);
   });
 }
 
@@ -1121,25 +1147,35 @@ function outboxRead(){ try{ return JSON.parse(localStorage.getItem(OUTBOX_KEY) |
 function outboxWrite(o){ try{ if(Object.keys(o).length) localStorage.setItem(OUTBOX_KEY, JSON.stringify(o)); else localStorage.removeItem(OUTBOX_KEY); }catch(e){} }
 function outboxAdd(key, value){ const o = outboxRead(); o[key] = value; outboxWrite(o); }
 function outboxRemove(key, value){ const o = outboxRead(); if(o[key] !== undefined && o[key] === value) { delete o[key]; outboxWrite(o); } }
+function outboxDelete(key){ const o = outboxRead(); if(o[key] !== undefined){ delete o[key]; outboxWrite(o); } }
 function outboxSize(){ return Object.keys(outboxRead()).length; }
 
 // Re-send anything that failed to save earlier. Safe to call often.
+// Record lists (bookings, expenses, handovers) are never written raw from the outbox —
+// they go back through the merge-sync so another device's new records are never overwritten.
+let _dataLoaded = false;
 async function flushOutbox(){
   const o = outboxRead();
   const keys = Object.keys(o);
   if(!keys.length) return 0;
-  const items = keys.map(key => ({ key, value: o[key] }));
+  const listKeys = keys.filter(k => LIST_KEYS.includes(k));
+  if(listKeys.length && _dataLoaded){ listKeys.forEach(k => _listDirty.add(k)); scheduleListSync(0); }
+  const items = keys.filter(k => !LIST_KEYS.includes(k)).map(key => ({ key, value: o[key] }));
+  if(!items.length) return listKeys.length;
+  _writesInFlight++;
   try{
     await gasFetchWithRetry(GAS_URL, {
       method: 'POST',
       body: JSON.stringify({ action: 'writeMany', items }),
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }
     });
-    items.forEach(i => { outboxRemove(i.key, i.value); if(bulkCache) bulkCache[i.key] = i.value; });
+    _writesInFlight--;
+    items.forEach(i => { outboxRemove(i.key, i.value); mirrorSet(i.key, i.value); if(bulkCache) bulkCache[i.key] = i.value; });
     setSyncStatus(true);
     showToast(`Synced ${items.length} pending change(s) to the shared database`);
     return items.length;
   }catch(e){
+    _writesInFlight--;
     console.warn('Outbox flush failed, will retry', e);
     setSyncStatus(false);
     return 0;
@@ -1184,24 +1220,80 @@ async function storageGetFresh(key){
   return data.value;
 }
 
+// ---------------- Background list sync ----------------
+// Saving a list used to block the screen for two sheet round trips (read-to-merge, then
+// write) on every single action. Now a save just marks the list "dirty" and returns at once;
+// the screen updates immediately and this engine does the same merge-then-write in the
+// background, batching everything changed in the meantime into one read + one write.
+// The merge rules are unchanged (see mergeList), so other devices' records are still kept.
+const _listDirty = new Set();
+let _listSyncing = false, _listSyncTimer = null, _listRetryTimer = null;
+
+function scheduleListSync(ms){
+  clearTimeout(_listSyncTimer);
+  _listSyncTimer = setTimeout(runListSync, ms || 0);
+}
+
 // Saves a list key, first folding in whatever other devices have written since we last looked.
-async function saveListMerged(key){
-  let local = listGet[key]();
-  if(!lastServerIds[key]) lastServerIds[key] = idsOf(local);
+function saveListMerged(key){
+  _listDirty.add(key);
+  // Crash safety: until the sheet confirms, this device keeps a copy of the change.
+  try{ outboxAdd(key, JSON.stringify(listGet[key]())); }catch(e){}
+  setSyncStatus('saving');
+  scheduleListSync(250);
+  return Promise.resolve();
+}
+
+function sameList(a, b){
+  if(a.length !== b.length) return false;
+  for(let i = 0; i < a.length; i++) if(a[i] !== b[i]) return false;
+  return true;
+}
+
+async function runListSync(){
+  if(_listSyncing || _pulling){ scheduleListSync(400); return; }
+  if(!_listDirty.size) return;
+  _listSyncing = true;
+  setSyncStatus('saving');
+  const keys = Array.from(_listDirty);
+  _listDirty.clear();
+  const failed = [];
   try{
-    const fresh = await storageGetFresh(key);
-    const remote = parseList(fresh);
-    const merged = mergeList(local, remote, lastServerIds[key]);
-    if(JSON.stringify(merged) !== JSON.stringify(local)){
-      listSet[key](merged);
-      local = merged;
-      scheduleRerender();
-    }
+    // One read per changed list, all in parallel.
+    const fresh = await Promise.all(keys.map(k =>
+      storageGetFresh(k).then(v => ({ ok: true, v }), () => ({ ok: false }))
+    ));
+    const writes = [];
+    let changed = false;
+    keys.forEach((key, i) => {
+      if(!fresh[i].ok){ failed.push(key); return; } // can't merge safely right now — retry later, data stays in the outbox
+      let local = listGet[key]();
+      if(!lastServerIds[key]) lastServerIds[key] = idsOf(local);
+      const merged = mergeList(local, parseList(fresh[i].v), lastServerIds[key]);
+      if(!sameList(merged, local)){ listSet[key](merged); local = merged; changed = true; }
+      lastServerIds[key] = idsOf(local);
+      const value = JSON.stringify(local);
+      writes.push(storageSet(key, value).then(r => {
+        if(r){ if(!_listDirty.has(key)) outboxDelete(key); }
+        else failed.push(key);
+      }));
+    });
+    // Ride along in the same write request instead of costing a separate one.
+    if(_activityTimer) flushActivityLog();
+    if(changed) scheduleRerender();
+    await Promise.all(writes);
   }catch(e){
-    // Offline or the sheet is slow — save what we have; the outbox will retry if the write fails too.
+    console.error('Background sync failed', e);
+    keys.forEach(k => { if(!failed.includes(k)) failed.push(k); });
+  }finally{
+    _listSyncing = false;
+    if(failed.length){
+      clearTimeout(_listRetryTimer);
+      _listRetryTimer = setTimeout(() => { failed.forEach(k => _listDirty.add(k)); scheduleListSync(0); }, 15000);
+    }
+    if(_listDirty.size) scheduleListSync(150);
+    setSyncStatus(!failed.length);
   }
-  lastServerIds[key] = idsOf(local);
-  return storageSet(key, JSON.stringify(local));
 }
 
 let _rerenderTimer = null;
@@ -1213,14 +1305,16 @@ function scheduleRerender(){
 }
 
 // Pulls the latest copy of everything from the sheet and folds it into what's on screen.
-async function pullFromServer(reason){
-  if(_pulling || !session) return;
-  if(_writeQueue.size > 0) return; // a save is in flight — it will merge on its own
+async function pullFromServer(reason, prefetched){
+  if(_pulling || !session || !_dataLoaded) return false;
+  if(syncBusy()) return false; // a save is in flight — it merges on its own
+  if(outboxSize() > 0){ await flushOutbox(); if(syncBusy()) return false; }
   _pulling = true;
   try{
-    if(outboxSize() > 0) await flushOutbox();
-    const all = await storageGetAll();
-    if(!all) return;
+    const all = prefetched || await storageGetAll();
+    if(!all) return false;
+    // A save started while we were fetching — skip this round so it can't be undone by an older copy.
+    if(syncBusy()) return false;
     let changed = false;
     const pushes = [];
 
@@ -1279,8 +1373,10 @@ async function pullFromServer(reason){
       if(reason !== 'silent') showToast('Updated with changes from other devices');
     }
     setSyncStatus(true);
+    return true;
   }catch(e){
     console.warn('Live sync pull failed', e);
+    return false;
   }finally{
     _pulling = false;
   }
@@ -1289,8 +1385,16 @@ async function pullFromServer(reason){
 function startLiveSync(){
   if(_liveSyncTimer) clearInterval(_liveSyncTimer);
   _liveSyncTimer = setInterval(() => { if(!document.hidden) pullFromServer('silent'); }, LIVE_SYNC_INTERVAL_MS);
-  document.addEventListener('visibilitychange', () => { if(!document.hidden) pullFromServer(); });
-  window.addEventListener('focus', () => pullFromServer());
+  // Focus + visibility both fire when you switch back to the tab; one pull every 30s is plenty
+  // and keeps the sheet free to answer your saves quickly.
+  let lastFocusPull = 0;
+  const focusPull = () => {
+    if(document.hidden || Date.now() - lastFocusPull < 30000) return;
+    lastFocusPull = Date.now();
+    pullFromServer();
+  };
+  document.addEventListener('visibilitychange', focusPull);
+  window.addEventListener('focus', focusPull);
   window.addEventListener('online', () => { flushOutbox().then(() => pullFromServer()); });
   if(outboxSize() > 0) flushOutbox();
 }
@@ -1305,7 +1409,11 @@ async function storageSet(key, value){
 }
 
 // Don't lose anything still queued if the tab is closed mid-save.
-window.addEventListener('beforeunload', () => {
+window.addEventListener('beforeunload', (ev) => {
+  if(_activityTimer){ clearTimeout(_activityTimer); _activityTimer = null; _writeQueue.set('greyroom:activity-log', JSON.stringify(activityLog)); }
+  // Record lists still syncing are kept in this device's outbox and merged on next open;
+  // also ask the browser to confirm so the save can finish first.
+  if(_listDirty.size > 0 || _listSyncing){ ev.preventDefault(); ev.returnValue = ''; }
   if(_writeQueue.size > 0){
     const items = Array.from(_writeQueue, ([key, value]) => ({ key, value }));
     try{
@@ -1319,26 +1427,57 @@ window.addEventListener('beforeunload', () => {
 
 // ---------------- Boot sequence ----------------
 let bulkCache = null; // populated once at boot via storageGetAll() — avoids ~9 sequential round trips
-async function init(){
-  bulkCache = await storageGetAll(); // one round trip fetches every key; null means the fetch genuinely failed
-  const fetchFailed = bulkCache === null;
-  if(bulkCache === null){
-    // Sheet unreachable — open with the copy this device saved last time, so nothing looks lost.
-    const mirror = mirrorGetAll();
-    bulkCache = Object.keys(mirror).length ? mirror : {};
-    if(Object.keys(mirror).length) console.warn('Storage unreachable — using the local mirror from the last successful sync');
-  } else {
-    Object.keys(bulkCache).forEach(k => mirrorSet(k, bulkCache[k]));
-  }
-  // Changes that never reached the sheet (saved while offline) take precedence until they are synced.
+let _bulkComplete = false; // true once bulkCache holds a full copy of the sheet (fresh or last-synced)
+let _serverLists = {}; // the server's copy of each record list at boot, before local unsynced changes are laid on top
+
+// Lays this device's unsynced changes (the outbox) over a server snapshot.
+// Record lists are combined, never replaced, so nothing from either side is lost.
+function overlayOutbox(cache){
+  _serverLists = {};
+  LIST_KEYS.forEach(k => { _serverLists[k] = cache[k] || ''; });
   const outbox = outboxRead();
-  Object.keys(outbox).forEach(k => { bulkCache[k] = outbox[k]; });
-  if(Object.keys(outbox).length) flushOutbox();
+  Object.keys(outbox).forEach(k => {
+    if(LIST_KEYS.includes(k)){
+      cache[k] = JSON.stringify(mergeList(parseList(outbox[k]), parseList(cache[k]), new Set()));
+    } else {
+      cache[k] = outbox[k];
+    }
+  });
+  return cache;
+}
+
+async function init(){
+  // Fast start: if this device has opened the app before, show it straight away from the
+  // local copy and refresh from the sheet in the background (changes merge in on arrival).
+  const mirror = mirrorGetAll();
+  let fetchFailed = false;
+  if(mirror['greyroom:access-list']){
+    bulkCache = overlayOutbox(Object.assign({}, mirror));
+    _bulkComplete = true;
+    setSyncStatus('saving');
+    storageGetAll().then(all => { if(all) applyBootRefresh(all); else setSyncStatus(false); });
+  } else {
+    bulkCache = await storageGetAll(); // one round trip fetches every key; null means the fetch genuinely failed
+    fetchFailed = bulkCache === null;
+    if(bulkCache === null){
+      bulkCache = {};
+    } else {
+      _bulkComplete = true;
+      Object.keys(bulkCache).forEach(k => mirrorSet(k, bulkCache[k]));
+    }
+    overlayOutbox(bulkCache);
+  }
+  if(outboxSize()) flushOutbox(); // non-list keys only until the data is loaded
 
   const res = await storageGet('greyroom:access-list');
 
   accessList = res && res.value ? JSON.parse(res.value) : [];
+  showGate(fetchFailed);
+}
 
+function showGate(fetchFailed){
+  document.getElementById('bootstrapForm').style.display = 'none';
+  document.getElementById('loginForm').style.display = 'none';
   if(accessList.length === 0){
     document.getElementById('gateSub').textContent = 'Set up access for your team';
     document.getElementById('bootstrapForm').style.display = 'block';
@@ -1350,6 +1489,32 @@ async function init(){
     document.getElementById('gateSub').textContent = 'Enter your access code to continue';
     document.getElementById('loginForm').style.display = 'block';
   }
+}
+
+// The fresh copy from the sheet arrived after a fast start from the local copy.
+function applyBootRefresh(all){
+  Object.keys(all).forEach(k => mirrorSet(k, all[k]));
+  if(!session){
+    // Still on the sign-in screen: just swap in the fresh data before anything is loaded.
+    bulkCache = overlayOutbox(Object.assign({}, all));
+    try{ accessList = JSON.parse(bulkCache['greyroom:access-list'] || '[]'); }catch(e){}
+    if(document.getElementById('gateScreen').style.display !== 'none') showGate(false);
+    setSyncStatus(true);
+    return;
+  }
+  if(!_dataLoaded){ setTimeout(() => applyBootRefresh(all), 300); return; }
+  // Signed in already: fold the fresh copy in with the usual merge rules.
+  pullFromServer('silent', all).then(applied => {
+    if(!applied) setTimeout(() => pullFromServer('silent'), 3000);
+    // Access revoked on another device since this device last synced
+    if(session && accessList.length && !accessList.some(p => p.code.toUpperCase() === String(session.code).toUpperCase())){
+      session = null;
+      document.getElementById('appScreen').style.display = 'none';
+      document.getElementById('gateScreen').style.display = 'flex';
+      showGate(false);
+      document.getElementById('gateError').textContent = 'Your access code is no longer active.';
+    }
+  });
 }
 
 async function doBootstrap(){
@@ -1449,7 +1614,7 @@ async function enterApp(){
 async function loadData(){
   const propsRes = await storageGet('greyroom:properties');
   properties = propsRes && propsRes.value ? JSON.parse(propsRes.value) : [...DEFAULT_PROPERTIES];
-  if(!propsRes) await storageSet('greyroom:properties', JSON.stringify(properties));
+  if(!propsRes) storageSet('greyroom:properties', JSON.stringify(properties));
 
   const pendRes = await storageGet('greyroom:pending');
   pending = pendRes && pendRes.value ? JSON.parse(pendRes.value) : [];
@@ -1470,7 +1635,7 @@ async function loadData(){
   months = monthsRes && monthsRes.value ? JSON.parse(monthsRes.value) : [];
   if(months.length === 0){
     months = ["July'26"];
-    await storageSet('greyroom:months', JSON.stringify(months));
+    storageSet('greyroom:months', JSON.stringify(months));
   }
 
   // Normalize smart/curly apostrophes (mobile keyboards often auto-convert ' to ’),
@@ -1487,6 +1652,13 @@ async function loadData(){
   if(monthsChanged) await saveMonths();
 
   currentMonth = months[months.length - 1];
+
+  // Remember what the server held at boot (before this device's unsynced changes were laid on top),
+  // so later saves can tell "added here" from "deleted elsewhere".
+  LIST_KEYS.forEach(k => {
+    const src = Object.prototype.hasOwnProperty.call(_serverLists, k) ? _serverLists[k] : (bulkCache && bulkCache[k]);
+    lastServerIds[k] = idsOf(parseList(src));
+  });
 
   // Migrate any entries saved before month-tracking existed — they all belong to the earliest tracked month.
   // Also normalize any entries whose .month has mismatched punctuation (e.g. curly vs straight apostrophe)
@@ -1510,12 +1682,6 @@ async function loadData(){
   const logRes = await storageGet('greyroom:activity-log');
   activityLog = logRes && logRes.value ? JSON.parse(logRes.value) : [];
 
-  // Remember what the server holds right now, so later saves can tell "added here" from "deleted elsewhere".
-  lastServerIds['greyroom:pending'] = idsOf(pending);
-  lastServerIds['greyroom:confirmed'] = idsOf(confirmed);
-  lastServerIds['greyroom:expenses'] = idsOf(expenses);
-  lastServerIds['greyroom:handovers'] = idsOf(handovers);
-
   renderProperties();
   renderMonthBar();
   renderPending();
@@ -1530,12 +1696,18 @@ async function loadData(){
   updateExpensePreview();
   updateStats();
 
+  _dataLoaded = true;
+  // Anything this device saved but the sheet never confirmed → sync it now (merged, never overwriting).
+  const unsynced = Object.keys(outboxRead()).filter(k => LIST_KEYS.includes(k));
+  if(unsynced.length){ unsynced.forEach(k => _listDirty.add(k)); scheduleListSync(0); }
+
   try{ await recoverLocalData(true); }catch(e){ console.error('Silent recovery check failed', e); }
 }
 
-async function saveMonths(){ await storageSet('greyroom:months', JSON.stringify(months)); }
+// Small single-value saves: queued in the background, the screen never waits for them.
+function saveMonths(){ storageSet('greyroom:months', JSON.stringify(months)); return Promise.resolve(); }
 
-async function savePending(){ await saveListMerged('greyroom:pending'); }
+function savePending(){ return saveListMerged('greyroom:pending'); }
 // ---------------- Readable per-month reservation tab in Google Sheets ----------------
 // Mirrors the confirmed database into a normal spreadsheet table (one tab per month),
 // laid out the same way as the Greyroom sales sheet.
@@ -1600,7 +1772,9 @@ function syncMonthToSheet(monthKey){
   const mk = monthKey || currentMonth;
   if(!mk) return;
   clearTimeout(_sheetSyncTimers[mk]);
-  _sheetSyncTimers[mk] = setTimeout(() => {
+  _sheetSyncTimers[mk] = setTimeout(function run(){
+    // Let the data save finish first — the sheet answers one request at a time.
+    if(syncBusy()){ _sheetSyncTimers[mk] = setTimeout(run, 1500); return; }
     gasFetchWithRetry(GAS_URL, {
       method: 'POST',
       body: JSON.stringify({
@@ -1612,18 +1786,19 @@ function syncMonthToSheet(monthKey){
       }),
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }
     }).catch(e => console.error('Reservation tab sync failed for ' + mk, e));
-  }, 1500);
+  }, 2500);
 }
 
-async function saveConfirmed(){
-  await saveListMerged('greyroom:confirmed');
-  syncMonthToSheet(currentMonth); // not awaited — the save itself is already done
+function saveConfirmed(){
+  saveListMerged('greyroom:confirmed');
+  syncMonthToSheet(currentMonth); // not awaited — runs after the save settles
+  return Promise.resolve();
 }
-async function saveExpenses(){ await saveListMerged('greyroom:expenses'); }
-async function saveHandovers(){ await saveListMerged('greyroom:handovers'); }
-async function saveHistoricalAnalysis(){ await storageSet('greyroom:historical-analysis', JSON.stringify(historicalAnalysis)); }
-async function saveProperties(){ await storageSet('greyroom:properties', JSON.stringify(properties)); }
-async function saveAccessList(){ await storageSet('greyroom:access-list', JSON.stringify(accessList)); }
+function saveExpenses(){ return saveListMerged('greyroom:expenses'); }
+function saveHandovers(){ return saveListMerged('greyroom:handovers'); }
+function saveHistoricalAnalysis(){ storageSet('greyroom:historical-analysis', JSON.stringify(historicalAnalysis)); return Promise.resolve(); }
+function saveProperties(){ storageSet('greyroom:properties', JSON.stringify(properties)); return Promise.resolve(); }
+function saveAccessList(){ storageSet('greyroom:access-list', JSON.stringify(accessList)); return Promise.resolve(); }
 
 // ---------------- Excel import (historical sales sheet) ----------------
 const PLATFORM_MAP = {
