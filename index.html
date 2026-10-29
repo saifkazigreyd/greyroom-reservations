@@ -363,7 +363,6 @@
           <option>Bkash Merchant</option>
           <option>Brac Bank</option>
           <option>Payoneer</option>
-          <option>Travela</option>
         </select>
 
         <label>Notes</label>
@@ -412,7 +411,6 @@
                 <option value="Bkash Merchant">Bkash Merchant</option>
                 <option value="Brac Bank">Brac Bank</option>
                 <option value="Payoneer">Payoneer</option>
-                <option value="Travela">Travela</option>
                 <option value="__unset__">Not set / other</option>
               </select>
             </div>
@@ -467,7 +465,6 @@
               <option>Bkash Merchant</option>
               <option>Brac Bank</option>
               <option>Payoneer</option>
-              <option>Travela</option>
             </select>
             <button class="btn" style="margin:0;flex:1;" onclick="commitBulkExpenses()">Add all to expense list</button>
           </div>
@@ -508,7 +505,6 @@
               <option>Bkash Merchant</option>
               <option>Brac Bank</option>
               <option>Payoneer</option>
-              <option>Travela</option>
         </select>
         <div class="row2">
           <div><label>Item / Description</label>
@@ -631,7 +627,7 @@
     <div class="panel">
       <h2>Gateway statement</h2>
       <div style="font-size:12.5px;color:#9a958a;margin-bottom:14px;">
-        Account-style statements for Saif Bkash, Sajib Bkash and Tanim bhaiya (Payoneer + Brac Bank + Cash + Travela + Bkash Merchant combined). <b style="color:var(--brass-bright);">Credit</b> = booking money received (confirmed bookings), <b style="color:var(--brass-bright);">Debit</b> = expenses paid from it. Starts fresh from November'26; each month opens with the previous month's closing balance. Expenses only appear here once "Paid from" is set on them in Financials.
+        Account-style statements for Saif Bkash, Sajib Bkash and Tanim bhaiya (Payoneer + Brac Bank + Cash + Bkash Merchant combined). <b style="color:var(--brass-bright);">Credit</b> = booking money received (confirmed bookings), <b style="color:var(--brass-bright);">Debit</b> = expenses paid from it. Starts fresh from November'26; each month opens with the previous month's closing balance. Expenses only appear here once "Paid from" is set on them in Financials.
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;">
         <div style="flex:1;min-width:160px;">
@@ -639,7 +635,7 @@
           <select id="stmtGateway" onchange="renderStatement()">
             <option value="Saif Bkash">Saif Bkash</option>
             <option value="Sajib Bkash">Sajib Bkash</option>
-            <option value="Tanim bhaiya">Tanim bhaiya (Payoneer + Brac + Cash + Travela + Bkash Merchant)</option>
+            <option value="Tanim bhaiya">Tanim bhaiya (Payoneer + Brac + Cash + Bkash Merchant)</option>
           </select>
         </div>
         <div style="flex:1;min-width:160px;">
@@ -893,7 +889,6 @@
       <option>Bkash Merchant</option>
       <option>Brac Bank</option>
       <option>Payoneer</option>
-      <option>Travela</option>
     </select>
 
     <label>Notes</label>
@@ -941,7 +936,6 @@
               <option>Bkash Merchant</option>
               <option>Brac Bank</option>
               <option>Payoneer</option>
-              <option>Travela</option>
     </select>
 
     <label>Item / Description</label>
@@ -1789,7 +1783,7 @@ function savePending(){ return saveListMerged('greyroom:pending'); }
 const SALES_SHEET_HEADER = [
   'S/L','Guest name','Property','Payment Gateway (optional note)','Platform',
   'USD (Payoneer)','Cash','Saif Bkash','Handover (not sales)','Brac Bank',
-  'Payoneer BDT (ref)','Bkash Merchant','Guest Phone','Check-in','Check-out','Sajib Bkash','Travela'
+  'Payoneer BDT (ref)','Bkash Merchant','Guest Phone','Check-in','Check-out','Sajib Bkash'
 ];
 
 function buildSalesSheetRows(monthKey){
@@ -1808,7 +1802,7 @@ function buildSalesSheetRows(monthKey){
     const isUSD = c.currency === 'USD';
     const gw = c.gateway || '';
 
-    let usd = '', cash = '', saif = '', brac = '', payoneerBdt = '', merchant = '', sajib = '', travela = '';
+    let usd = '', cash = '', saif = '', brac = '', payoneerBdt = '', merchant = '', sajib = '';
     if(gw === 'Payoneer'){
       if(isUSD){ usd = amt; payoneerBdt = amt === null ? '' : Math.round(amt * USD_TO_BDT); }
       else { payoneerBdt = amt; }
@@ -1817,7 +1811,6 @@ function buildSalesSheetRows(monthKey){
     else if(gw === 'Brac Bank'){ brac = isUSD && amt !== null ? Math.round(amt * USD_TO_BDT) : amt; }
     else if(gw === 'Bkash Merchant'){ merchant = isUSD && amt !== null ? Math.round(amt * USD_TO_BDT) : amt; }
     else if(gw === 'Sajib Bkash'){ sajib = isUSD && amt !== null ? Math.round(amt * USD_TO_BDT) : amt; }
-    else if(gw === 'Travela'){ travela = isUSD && amt !== null ? Math.round(amt * USD_TO_BDT) : amt; }
 
     const ho = handoverFor(c);
 
@@ -1837,8 +1830,7 @@ function buildSalesSheetRows(monthKey){
       c.contact || '',
       c.checkin || '',
       c.checkout || '',
-      sajib === null ? '' : sajib,
-      travela === null ? '' : travela
+      sajib === null ? '' : sajib
     ];
   });
 }
@@ -1894,7 +1886,6 @@ const GATEWAY_MAP = {
   'saif bkash': 'Saif Bkash',
   'sajib bkash': 'Sajib Bkash',
   'sajib': 'Sajib Bkash',
-  'travela': 'Travela',
   'merchant': 'Bkash Merchant',
   'brac': 'Brac Bank'
 };
@@ -2087,7 +2078,7 @@ async function handleExcelImport(event){
         const phone = r[12] !== undefined && r[12] !== null ? String(r[12]).trim() : '';
         const checkin = parseExcelDateToISO(r[13]);
         const checkout = parseExcelDateToISO(r[14]);
-        const sajibCol = r[15], travelaCol = r[16];
+        const sajibCol = r[15];
 
         // Build one "bucket" per gateway that actually has money against it on this row.
         // A row can have more than one bucket — that means the reservation's payment
@@ -2110,7 +2101,6 @@ async function handleExcelImport(event){
         if(typeof brac === 'number') buckets.push({ gateway: 'Brac Bank', currency: 'BDT', amount: brac });
         if(typeof bkashMarchent === 'number') buckets.push({ gateway: 'Bkash Merchant', currency: 'BDT', amount: bkashMarchent });
         if(typeof sajibCol === 'number') buckets.push({ gateway: 'Sajib Bkash', currency: 'BDT', amount: sajibCol });
-        if(typeof travelaCol === 'number') buckets.push({ gateway: 'Travela', currency: 'BDT', amount: travelaCol });
 
         if(typeof handover === 'number' && handover > 0){
           const hEntry = {
@@ -4117,7 +4107,7 @@ function renderAnalysisSuggestions(){
 const STATEMENT_ACCOUNTS = {
   'Saif Bkash': ['Saif Bkash'],
   'Sajib Bkash': ['Sajib Bkash'],
-  'Tanim bhaiya': ['Payoneer', 'Brac Bank', 'Cash', 'Travela', 'Bkash Merchant']
+  'Tanim bhaiya': ['Payoneer', 'Brac Bank', 'Cash', 'Bkash Merchant']
 };
 // Earlier months' figures aren't reliable, so statements start fresh here (opening 0).
 // Each later month opens with the previous month's closing balance.
@@ -4251,7 +4241,7 @@ function exportStatementCsv(){
 }
 
 // ---------------- Financial reports ----------------
-const FIXED_GATEWAYS = ['Cash', 'Saif Bkash', 'Sajib Bkash', 'Bkash Merchant', 'Brac Bank', 'Payoneer', 'Travela'];
+const FIXED_GATEWAYS = ['Cash', 'Saif Bkash', 'Sajib Bkash', 'Bkash Merchant', 'Brac Bank', 'Payoneer'];
 function computeHandoverSummary(monthKey){
   const mk = monthKey || currentMonth;
   const totals = {};
