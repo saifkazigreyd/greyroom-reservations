@@ -363,6 +363,7 @@
           <option>Bkash Merchant</option>
           <option>Brac Bank</option>
           <option>Payoneer</option>
+          <option>Travela</option>
         </select>
 
         <label>Notes</label>
@@ -411,6 +412,7 @@
                 <option value="Bkash Merchant">Bkash Merchant</option>
                 <option value="Brac Bank">Brac Bank</option>
                 <option value="Payoneer">Payoneer</option>
+                <option value="Travela">Travela</option>
                 <option value="__unset__">Not set / other</option>
               </select>
             </div>
@@ -465,6 +467,7 @@
               <option>Bkash Merchant</option>
               <option>Brac Bank</option>
               <option>Payoneer</option>
+              <option>Travela</option>
             </select>
             <button class="btn" style="margin:0;flex:1;" onclick="commitBulkExpenses()">Add all to expense list</button>
           </div>
@@ -505,6 +508,7 @@
               <option>Bkash Merchant</option>
               <option>Brac Bank</option>
               <option>Payoneer</option>
+              <option>Travela</option>
         </select>
         <div class="row2">
           <div><label>Item / Description</label>
@@ -627,29 +631,27 @@
     <div class="panel">
       <h2>Gateway statement</h2>
       <div style="font-size:12.5px;color:#9a958a;margin-bottom:14px;">
-        Account-style statement for one payment gateway. <b style="color:var(--brass-bright);">Credit</b> = booking money received into it (confirmed bookings), <b style="color:var(--brass-bright);">Debit</b> = expenses paid from it. Expenses only appear here once "Paid from" is set on them in Financials.
+        Account-style statements for Saif Bkash, Sajib Bkash and Tanim bhaiya (Payoneer + Brac Bank + Cash + Travela + Bkash Merchant combined). <b style="color:var(--brass-bright);">Credit</b> = booking money received (confirmed bookings), <b style="color:var(--brass-bright);">Debit</b> = expenses paid from it. Starts fresh from November'26; each month opens with the previous month's closing balance. Expenses only appear here once "Paid from" is set on them in Financials.
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;">
         <div style="flex:1;min-width:160px;">
-          <label style="margin:0 0 5px;">Payment gateway</label>
+          <label style="margin:0 0 5px;">Account</label>
           <select id="stmtGateway" onchange="renderStatement()">
-            <option>Saif Bkash</option>
-            <option>Sajib Bkash</option>
-            <option>Bkash Merchant</option>
-            <option>Cash</option>
-            <option>Brac Bank</option>
-            <option>Payoneer</option>
+            <option value="Saif Bkash">Saif Bkash</option>
+            <option value="Sajib Bkash">Sajib Bkash</option>
+            <option value="Tanim bhaiya">Tanim bhaiya (Payoneer + Brac + Cash + Travela + Bkash Merchant)</option>
           </select>
         </div>
         <div style="flex:1;min-width:160px;">
           <label style="margin:0 0 5px;">Period</label>
           <select id="stmtPeriod" onchange="renderStatement()">
             <option value="month">Selected month (opening balance carried forward)</option>
-            <option value="all">All months</option>
+            <option value="all">All months (from November'26)</option>
           </select>
         </div>
         <button class="btn-ghost" style="margin:0;padding:11px 16px;" onclick="exportStatementCsv()">Download CSV</button>
       </div>
+      <div class="kpi-grid" id="stmtAccounts" style="margin-bottom:14px;"></div>
       <div class="kpi-grid" id="stmtKpis" style="margin-bottom:18px;"></div>
       <div class="table-wrap">
         <table class="db-table">
@@ -891,6 +893,7 @@
       <option>Bkash Merchant</option>
       <option>Brac Bank</option>
       <option>Payoneer</option>
+      <option>Travela</option>
     </select>
 
     <label>Notes</label>
@@ -938,6 +941,7 @@
               <option>Bkash Merchant</option>
               <option>Brac Bank</option>
               <option>Payoneer</option>
+              <option>Travela</option>
     </select>
 
     <label>Item / Description</label>
@@ -1785,7 +1789,7 @@ function savePending(){ return saveListMerged('greyroom:pending'); }
 const SALES_SHEET_HEADER = [
   'S/L','Guest name','Property','Payment Gateway (optional note)','Platform',
   'USD (Payoneer)','Cash','Saif Bkash','Handover (not sales)','Brac Bank',
-  'Payoneer BDT (ref)','Bkash Merchant','Guest Phone','Check-in','Check-out','Sajib Bkash'
+  'Payoneer BDT (ref)','Bkash Merchant','Guest Phone','Check-in','Check-out','Sajib Bkash','Travela'
 ];
 
 function buildSalesSheetRows(monthKey){
@@ -1804,7 +1808,7 @@ function buildSalesSheetRows(monthKey){
     const isUSD = c.currency === 'USD';
     const gw = c.gateway || '';
 
-    let usd = '', cash = '', saif = '', brac = '', payoneerBdt = '', merchant = '', sajib = '';
+    let usd = '', cash = '', saif = '', brac = '', payoneerBdt = '', merchant = '', sajib = '', travela = '';
     if(gw === 'Payoneer'){
       if(isUSD){ usd = amt; payoneerBdt = amt === null ? '' : Math.round(amt * USD_TO_BDT); }
       else { payoneerBdt = amt; }
@@ -1813,6 +1817,7 @@ function buildSalesSheetRows(monthKey){
     else if(gw === 'Brac Bank'){ brac = isUSD && amt !== null ? Math.round(amt * USD_TO_BDT) : amt; }
     else if(gw === 'Bkash Merchant'){ merchant = isUSD && amt !== null ? Math.round(amt * USD_TO_BDT) : amt; }
     else if(gw === 'Sajib Bkash'){ sajib = isUSD && amt !== null ? Math.round(amt * USD_TO_BDT) : amt; }
+    else if(gw === 'Travela'){ travela = isUSD && amt !== null ? Math.round(amt * USD_TO_BDT) : amt; }
 
     const ho = handoverFor(c);
 
@@ -1832,7 +1837,8 @@ function buildSalesSheetRows(monthKey){
       c.contact || '',
       c.checkin || '',
       c.checkout || '',
-      sajib === null ? '' : sajib
+      sajib === null ? '' : sajib,
+      travela === null ? '' : travela
     ];
   });
 }
@@ -1888,6 +1894,7 @@ const GATEWAY_MAP = {
   'saif bkash': 'Saif Bkash',
   'sajib bkash': 'Sajib Bkash',
   'sajib': 'Sajib Bkash',
+  'travela': 'Travela',
   'merchant': 'Bkash Merchant',
   'brac': 'Brac Bank'
 };
@@ -2080,7 +2087,7 @@ async function handleExcelImport(event){
         const phone = r[12] !== undefined && r[12] !== null ? String(r[12]).trim() : '';
         const checkin = parseExcelDateToISO(r[13]);
         const checkout = parseExcelDateToISO(r[14]);
-        const sajibCol = r[15];
+        const sajibCol = r[15], travelaCol = r[16];
 
         // Build one "bucket" per gateway that actually has money against it on this row.
         // A row can have more than one bucket — that means the reservation's payment
@@ -2103,6 +2110,7 @@ async function handleExcelImport(event){
         if(typeof brac === 'number') buckets.push({ gateway: 'Brac Bank', currency: 'BDT', amount: brac });
         if(typeof bkashMarchent === 'number') buckets.push({ gateway: 'Bkash Merchant', currency: 'BDT', amount: bkashMarchent });
         if(typeof sajibCol === 'number') buckets.push({ gateway: 'Sajib Bkash', currency: 'BDT', amount: sajibCol });
+        if(typeof travelaCol === 'number') buckets.push({ gateway: 'Travela', currency: 'BDT', amount: travelaCol });
 
         if(typeof handover === 'number' && handover > 0){
           const hEntry = {
@@ -4105,27 +4113,51 @@ function renderAnalysisSuggestions(){
 // Credit = confirmed booking money that landed in the gateway; Debit = expenses paid from it.
 // In "selected month" mode, everything from earlier months is rolled into the opening balance,
 // so the closing balance always matches the all-months running balance.
-function computeStatement(gateway, period){
-  const monthIdx = m => { const i = months.indexOf(m); return i === -1 ? months.length : i; };
+// Statement accounts — Tanim bhaiya's account is the combined balance of several gateways.
+const STATEMENT_ACCOUNTS = {
+  'Saif Bkash': ['Saif Bkash'],
+  'Sajib Bkash': ['Sajib Bkash'],
+  'Tanim bhaiya': ['Payoneer', 'Brac Bank', 'Cash', 'Travela', 'Bkash Merchant']
+};
+// Earlier months' figures aren't reliable, so statements start fresh here (opening 0).
+// Each later month opens with the previous month's closing balance.
+const STATEMENT_START_MONTH = "November'26";
+const _MONTH_NAMES = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+function monthOrdinal(label){
+  const m = String(label || '').trim().toLowerCase().match(/^([a-z]+)[^0-9]*(\d{2,4})$/);
+  if(m){
+    const mi = _MONTH_NAMES.indexOf(m[1].slice(0,3));
+    let y = parseInt(m[2], 10); if(y < 100) y += 2000;
+    if(mi !== -1) return y * 12 + mi;
+  }
+  const i = months.indexOf(label);
+  return i === -1 ? Infinity : 100000 + i; // unrecognised labels fall back to tab order
+}
+function computeStatement(account, period){
+  const gws = STATEMENT_ACCOUNTS[account] || [account];
+  const startOrd = monthOrdinal(STATEMENT_START_MONTH);
+  const monthIdx = m => monthOrdinal(m);
+  const inScope = m => monthIdx(m) >= startOrd;
+  const multi = gws.length > 1;
   const txns = [];
   confirmed.forEach(c => {
-    if(c.gateway !== gateway) return;
+    if(!gws.includes(c.gateway) || !inScope(c.month)) return;
     const amt = toBdtNumber(c.amount, c.currency);
     if(!amt) return;
     txns.push({
       month: c.month, mi: monthIdx(c.month), date: c.checkin || '', kind: 'credit',
-      particulars: `Booking — ${c.guest || 'Guest'}${c.platform ? ' (' + c.platform + ')' : ''}`,
+      particulars: `Booking — ${c.guest || 'Guest'}${c.platform ? ' (' + c.platform + ')' : ''}`, via: c.gateway,
       property: c.property || '', debit: 0, credit: amt
     });
   });
   expenses.forEach(e => {
-    if(e.gateway !== gateway) return;
+    if(!gws.includes(e.gateway) || !inScope(e.month)) return;
     const amt = toBdtNumber(e.amount, e.currency);
     if(!amt) return;
     const qty = e.qty > 1 ? ` × ${e.qty}` : '';
     txns.push({
       month: e.month, mi: monthIdx(e.month), date: e.date || '', kind: 'debit',
-      particulars: `Expense — ${e.item || e.category || 'Expense'}${qty}${e.category && e.item && e.item !== e.category ? ' (' + e.category + ')' : ''}`,
+      particulars: `Expense — ${e.item || e.category || 'Expense'}${qty}${e.category && e.item && e.item !== e.category ? ' (' + e.category + ')' : ''}`, via: e.gateway,
       property: e.property || '', debit: amt, credit: 0
     });
   });
@@ -4133,6 +4165,7 @@ function computeStatement(gateway, period){
   txns.sort((a,b) => (a.mi - b.mi) || (a.date || '9999').localeCompare(b.date || '9999') || (a.kind === b.kind ? 0 : a.kind === 'credit' ? -1 : 1));
 
   let opening = 0, rows = txns;
+  const beforeStart = monthIdx(currentMonth) < startOrd;
   if(period === 'month'){
     const cur = monthIdx(currentMonth);
     opening = txns.filter(t => t.mi < cur).reduce((s,t) => s + t.credit - t.debit, 0);
@@ -4142,7 +4175,7 @@ function computeStatement(gateway, period){
   rows = rows.map(t => { bal += t.credit - t.debit; return { ...t, balance: bal }; });
   const totalCredit = rows.reduce((s,t) => s + t.credit, 0);
   const totalDebit = rows.reduce((s,t) => s + t.debit, 0);
-  return { opening, rows, totalCredit, totalDebit, closing: opening + totalCredit - totalDebit };
+  return { opening, rows, totalCredit, totalDebit, closing: opening + totalCredit - totalDebit, multi, gws, beforeStart };
 }
 
 function renderStatement(){
@@ -4153,22 +4186,34 @@ function renderStatement(){
   const st = computeStatement(gateway, period);
   const fmt = n => (n < 0 ? '-' : '') + Math.round(Math.abs(n)).toLocaleString('en-IN');
   const balColor = n => n >= 0 ? 'var(--green)' : 'var(--red)';
-  const periodLabel = period === 'month' ? currentMonth : 'All months';
+  const periodLabel = period === 'month' ? currentMonth : `${STATEMENT_START_MONTH} onwards`;
+
+  // Balance of all three accounts at a glance (as of the selected month, or latest in "all")
+  document.getElementById('stmtAccounts').innerHTML = Object.keys(STATEMENT_ACCOUNTS).map(acc => {
+    const s2 = computeStatement(acc, period);
+    const active = acc === gateway;
+    return `<div class="kpi-card" style="cursor:pointer;${active ? 'border-color:var(--brass);' : ''}" onclick="document.getElementById('stmtGateway').value='${acc}';renderStatement()">
+      <div class="kpi-label">${escapeHtml(acc)}</div>
+      <div class="kpi-value" style="color:${balColor(s2.closing)};">BDT ${fmt(s2.closing)}</div>
+      <div class="kpi-sub">${escapeHtml(STATEMENT_ACCOUNTS[acc].length > 1 ? STATEMENT_ACCOUNTS[acc].join(' + ') : 'Closing · ' + periodLabel)}</div></div>`;
+  }).join('');
 
   document.getElementById('stmtKpis').innerHTML = [
-    { label: 'Opening balance', value: fmt(st.opening), sub: period === 'month' ? 'Carried from earlier months' : 'Start of records' },
+    { label: 'Opening balance', value: fmt(st.opening), sub: (period === 'month' && monthOrdinal(currentMonth) > monthOrdinal(STATEMENT_START_MONTH)) ? 'Carried from previous month' : `Fresh start · ${STATEMENT_START_MONTH}` },
     { label: 'Total credit (in)', value: fmt(st.totalCredit), sub: `${st.rows.filter(r => r.credit).length} booking(s)` },
     { label: 'Total debit (out)', value: fmt(st.totalDebit), sub: `${st.rows.filter(r => r.debit).length} expense(s)` },
     { label: 'Closing balance', value: fmt(st.closing), sub: `${gateway} · ${periodLabel}`, color: balColor(st.closing) }
   ].map(k => `<div class="kpi-card"><div class="kpi-label">${k.label}</div><div class="kpi-value"${k.color ? ` style="color:${k.color};"` : ''}>BDT ${k.value}</div><div class="kpi-sub">${escapeHtml(k.sub)}</div></div>`).join('');
 
   let html = `<tr style="color:#9a958a;"><td>—</td><td><i>Opening balance</i></td><td></td><td></td><td></td><td style="text-align:right;color:${balColor(st.opening)};">${fmt(st.opening)}</td></tr>`;
-  if(!st.rows.length){
+  if(st.beforeStart && period === 'month'){
+    html += `<tr><td colspan="6" style="color:#7a756a;">Statements start from ${STATEMENT_START_MONTH} — earlier months aren't included because their figures aren't reliable. Pick ${STATEMENT_START_MONTH} or a later month.</td></tr>`;
+  } else if(!st.rows.length){
     html += `<tr><td colspan="6" style="color:#7a756a;">No transactions for ${escapeHtml(gateway)} in ${escapeHtml(periodLabel)}.</td></tr>`;
   } else {
     html += st.rows.map(r => `<tr>
       <td style="white-space:nowrap;">${r.date ? fmtDate(r.date) : '—'}${period === 'all' ? `<div style="font-size:10.5px;color:#7a756a;">${escapeHtml(r.month || '')}</div>` : ''}</td>
-      <td>${escapeHtml(r.particulars)}</td>
+      <td>${escapeHtml(r.particulars)}${st.multi ? `<div style="font-size:10.5px;color:#7a756a;">via ${escapeHtml(r.via || '')}</div>` : ''}</td>
       <td>${escapeHtml(r.property)}</td>
       <td style="text-align:right;color:${r.debit ? 'var(--red)' : '#7a756a'};">${r.debit ? fmt(r.debit) : '—'}</td>
       <td style="text-align:right;color:${r.credit ? 'var(--green)' : '#7a756a'};">${r.credit ? fmt(r.credit) : '—'}</td>
@@ -4180,7 +4225,8 @@ function renderStatement(){
     <td style="text-align:right;color:${balColor(st.closing)};">${fmt(st.closing)}</td></tr>`;
   body.innerHTML = html;
 
-  const scope = period === 'month' ? expenses.filter(e => e.month === currentMonth) : expenses;
+  const startOrd = monthOrdinal(STATEMENT_START_MONTH);
+  const scope = period === 'month' ? expenses.filter(e => e.month === currentMonth) : expenses.filter(e => monthOrdinal(e.month) >= startOrd);
   const unassigned = scope.filter(e => !e.gateway);
   document.getElementById('stmtUnassigned').textContent = unassigned.length
     ? `${unassigned.length} expense(s) in ${periodLabel} (BDT ${fmt(unassigned.reduce((s,e) => s + toBdtNumber(e.amount, e.currency), 0))}) have no "Paid from" gateway yet, so they aren't in any statement. Set it via Edit in the Financials expense log.`
@@ -4192,10 +4238,10 @@ function exportStatementCsv(){
   const period = document.getElementById('stmtPeriod').value;
   const st = computeStatement(gateway, period);
   const q = v => `"${String(v).replace(/"/g, '""')}"`;
-  const lines = [['Month','Date','Particulars','Property','Debit (BDT)','Credit (BDT)','Balance (BDT)'].map(q).join(',')];
-  lines.push(['', '', 'Opening balance', '', '', '', Math.round(st.opening)].map(q).join(','));
-  st.rows.forEach(r => lines.push([r.month || '', r.date || '', r.particulars, r.property, r.debit ? Math.round(r.debit) : '', r.credit ? Math.round(r.credit) : '', Math.round(r.balance)].map(q).join(',')));
-  lines.push(['', '', 'Total / Closing balance', '', Math.round(st.totalDebit), Math.round(st.totalCredit), Math.round(st.closing)].map(q).join(','));
+  const lines = [['Month','Date','Particulars','Gateway','Property','Debit (BDT)','Credit (BDT)','Balance (BDT)'].map(q).join(',')];
+  lines.push(['', '', 'Opening balance', '', '', '', '', Math.round(st.opening)].map(q).join(','));
+  st.rows.forEach(r => lines.push([r.month || '', r.date || '', r.particulars, r.via || '', r.property, r.debit ? Math.round(r.debit) : '', r.credit ? Math.round(r.credit) : '', Math.round(r.balance)].map(q).join(',')));
+  lines.push(['', '', 'Total / Closing balance', '', '', Math.round(st.totalDebit), Math.round(st.totalCredit), Math.round(st.closing)].map(q).join(','));
   const blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -4205,7 +4251,7 @@ function exportStatementCsv(){
 }
 
 // ---------------- Financial reports ----------------
-const FIXED_GATEWAYS = ['Cash', 'Saif Bkash', 'Sajib Bkash', 'Bkash Merchant', 'Brac Bank', 'Payoneer'];
+const FIXED_GATEWAYS = ['Cash', 'Saif Bkash', 'Sajib Bkash', 'Bkash Merchant', 'Brac Bank', 'Payoneer', 'Travela'];
 function computeHandoverSummary(monthKey){
   const mk = monthKey || currentMonth;
   const totals = {};
