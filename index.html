@@ -293,6 +293,7 @@
   <div class="tabs" id="tabBar">
     <button class="tab-btn active" data-tab="reservations" onclick="switchTab('reservations')">Reservations</button>
     <button class="tab-btn" data-tab="financials" onclick="switchTab('financials')">Financials</button>
+    <button class="tab-btn" data-tab="statement" onclick="switchTab('statement')">Statement</button>
     <button class="tab-btn" data-tab="statistics" onclick="switchTab('statistics')">Statistics</button>
     <button class="tab-btn" data-tab="analysis" onclick="switchTab('analysis')">Expense &amp; Revenue Analysis</button>
     <button class="tab-btn" data-tab="admin" onclick="switchTab('admin')" id="adminTabBtn" style="display:none;">Manage access</button>
@@ -358,6 +359,7 @@
         <select id="f-gateway">
           <option>Cash</option>
           <option>Saif Bkash</option>
+          <option>Sajib Bkash</option>
           <option>Bkash Merchant</option>
           <option>Brac Bank</option>
           <option>Payoneer</option>
@@ -405,6 +407,7 @@
                 <option value="__all__">All gateways</option>
                 <option value="Cash">Cash</option>
                 <option value="Saif Bkash">Saif Bkash</option>
+                <option value="Sajib Bkash">Sajib Bkash</option>
                 <option value="Bkash Merchant">Bkash Merchant</option>
                 <option value="Brac Bank">Brac Bank</option>
                 <option value="Payoneer">Payoneer</option>
@@ -453,7 +456,16 @@
           </div>
           <div id="exBulkStatus" style="font-size:11.5px;color:#8f897d;margin-top:8px;"></div>
           <div id="exBulkPreview" class="bulk-preview" style="display:none;"></div>
-          <div id="exBulkActions" style="display:none;gap:8px;margin-top:10px;flex-wrap:wrap;">
+          <div id="exBulkActions" style="display:none;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center;">
+            <select id="ex-bulk-gateway" title="Paid from — applies to every line in this batch" style="margin:0;flex:1;min-width:150px;">
+              <option value="">Paid from: not specified</option>
+              <option>Cash</option>
+              <option>Saif Bkash</option>
+              <option>Sajib Bkash</option>
+              <option>Bkash Merchant</option>
+              <option>Brac Bank</option>
+              <option>Payoneer</option>
+            </select>
             <button class="btn" style="margin:0;flex:1;" onclick="commitBulkExpenses()">Add all to expense list</button>
           </div>
         </div>
@@ -484,6 +496,16 @@
           <div><label id="ex-amount-label">Amount (BDT)</label><input id="ex-amount" type="number" min="0" step="0.01" placeholder="e.g. 3500" oninput="updateExpensePreview()"></div>
         </div>
         <div id="expenseConvertedPreview" style="font-size:11.5px;color:#8f897d;margin-top:-6px;"></div>
+        <label>Paid from (payment gateway)</label>
+        <select id="ex-gateway">
+              <option value="">— Not specified —</option>
+              <option>Cash</option>
+              <option>Saif Bkash</option>
+              <option>Sajib Bkash</option>
+              <option>Bkash Merchant</option>
+              <option>Brac Bank</option>
+              <option>Payoneer</option>
+        </select>
         <div class="row2">
           <div><label>Item / Description</label>
             <input id="ex-item" placeholder="e.g. Electric Bill, Airfreshener, Service Charge"></div>
@@ -557,7 +579,7 @@
           </select>
           <div class="table-wrap" style="margin-top:12px;">
             <table class="db-table">
-              <thead><tr><th>Date</th><th>Item</th><th>Category</th><th>Amount (BDT)</th><th>Property</th><th></th></tr></thead>
+              <thead><tr><th>Date</th><th>Item</th><th>Category</th><th>Amount (BDT)</th><th>Property</th><th>Paid from</th><th></th></tr></thead>
               <tbody id="expenseBody"></tbody>
             </table>
           </div>
@@ -598,6 +620,44 @@
           <div id="exportStatus" style="font-size:11.5px;color:#8f897d;margin-top:10px;"></div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div id="tab-statement" style="display:none;">
+    <div class="panel">
+      <h2>Gateway statement</h2>
+      <div style="font-size:12.5px;color:#9a958a;margin-bottom:14px;">
+        Account-style statement for one payment gateway. <b style="color:var(--brass-bright);">Credit</b> = booking money received into it (confirmed bookings), <b style="color:var(--brass-bright);">Debit</b> = expenses paid from it. Expenses only appear here once "Paid from" is set on them in Financials.
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;">
+        <div style="flex:1;min-width:160px;">
+          <label style="margin:0 0 5px;">Payment gateway</label>
+          <select id="stmtGateway" onchange="renderStatement()">
+            <option>Saif Bkash</option>
+            <option>Sajib Bkash</option>
+            <option>Bkash Merchant</option>
+            <option>Cash</option>
+            <option>Brac Bank</option>
+            <option>Payoneer</option>
+          </select>
+        </div>
+        <div style="flex:1;min-width:160px;">
+          <label style="margin:0 0 5px;">Period</label>
+          <select id="stmtPeriod" onchange="renderStatement()">
+            <option value="month">Selected month (opening balance carried forward)</option>
+            <option value="all">All months</option>
+          </select>
+        </div>
+        <button class="btn-ghost" style="margin:0;padding:11px 16px;" onclick="exportStatementCsv()">Download CSV</button>
+      </div>
+      <div class="kpi-grid" id="stmtKpis" style="margin-bottom:18px;"></div>
+      <div class="table-wrap">
+        <table class="db-table">
+          <thead><tr><th>Date</th><th>Particulars</th><th>Property</th><th style="text-align:right;">Debit (BDT)</th><th style="text-align:right;">Credit (BDT)</th><th style="text-align:right;">Balance (BDT)</th></tr></thead>
+          <tbody id="stmtBody"></tbody>
+        </table>
+      </div>
+      <div id="stmtUnassigned" style="font-size:11.5px;color:#8f897d;margin-top:10px;"></div>
     </div>
   </div>
 
@@ -827,6 +887,7 @@
     <select id="ed-gateway">
       <option>Cash</option>
       <option>Saif Bkash</option>
+      <option>Sajib Bkash</option>
       <option>Bkash Merchant</option>
       <option>Brac Bank</option>
       <option>Payoneer</option>
@@ -868,6 +929,16 @@
       </div>
     </div>
     <div id="editExpenseConvertedPreview" style="font-size:11.5px;color:#8f897d;margin-top:-6px;"></div>
+    <label>Paid from (payment gateway)</label>
+    <select id="eex-gateway">
+              <option value="">— Not specified —</option>
+              <option>Cash</option>
+              <option>Saif Bkash</option>
+              <option>Sajib Bkash</option>
+              <option>Bkash Merchant</option>
+              <option>Brac Bank</option>
+              <option>Payoneer</option>
+    </select>
 
     <label>Item / Description</label>
     <input id="eex-item" placeholder="e.g. Electric Bill">
@@ -1714,7 +1785,7 @@ function savePending(){ return saveListMerged('greyroom:pending'); }
 const SALES_SHEET_HEADER = [
   'S/L','Guest name','Property','Payment Gateway (optional note)','Platform',
   'USD (Payoneer)','Cash','Saif Bkash','Handover (not sales)','Brac Bank',
-  'Payoneer BDT (ref)','Bkash Merchant','Guest Phone','Check-in','Check-out'
+  'Payoneer BDT (ref)','Bkash Merchant','Guest Phone','Check-in','Check-out','Sajib Bkash'
 ];
 
 function buildSalesSheetRows(monthKey){
@@ -1733,7 +1804,7 @@ function buildSalesSheetRows(monthKey){
     const isUSD = c.currency === 'USD';
     const gw = c.gateway || '';
 
-    let usd = '', cash = '', saif = '', brac = '', payoneerBdt = '', merchant = '';
+    let usd = '', cash = '', saif = '', brac = '', payoneerBdt = '', merchant = '', sajib = '';
     if(gw === 'Payoneer'){
       if(isUSD){ usd = amt; payoneerBdt = amt === null ? '' : Math.round(amt * USD_TO_BDT); }
       else { payoneerBdt = amt; }
@@ -1741,6 +1812,7 @@ function buildSalesSheetRows(monthKey){
     else if(gw === 'Saif Bkash'){ saif = isUSD && amt !== null ? Math.round(amt * USD_TO_BDT) : amt; }
     else if(gw === 'Brac Bank'){ brac = isUSD && amt !== null ? Math.round(amt * USD_TO_BDT) : amt; }
     else if(gw === 'Bkash Merchant'){ merchant = isUSD && amt !== null ? Math.round(amt * USD_TO_BDT) : amt; }
+    else if(gw === 'Sajib Bkash'){ sajib = isUSD && amt !== null ? Math.round(amt * USD_TO_BDT) : amt; }
 
     const ho = handoverFor(c);
 
@@ -1759,7 +1831,8 @@ function buildSalesSheetRows(monthKey){
       merchant === null ? '' : merchant,
       c.contact || '',
       c.checkin || '',
-      c.checkout || ''
+      c.checkout || '',
+      sajib === null ? '' : sajib
     ];
   });
 }
@@ -1813,6 +1886,8 @@ const GATEWAY_MAP = {
   'payoneer': 'Payoneer',
   'cash': 'Cash',
   'saif bkash': 'Saif Bkash',
+  'sajib bkash': 'Sajib Bkash',
+  'sajib': 'Sajib Bkash',
   'merchant': 'Bkash Merchant',
   'brac': 'Brac Bank'
 };
@@ -2005,6 +2080,7 @@ async function handleExcelImport(event){
         const phone = r[12] !== undefined && r[12] !== null ? String(r[12]).trim() : '';
         const checkin = parseExcelDateToISO(r[13]);
         const checkout = parseExcelDateToISO(r[14]);
+        const sajibCol = r[15];
 
         // Build one "bucket" per gateway that actually has money against it on this row.
         // A row can have more than one bucket — that means the reservation's payment
@@ -2026,6 +2102,7 @@ async function handleExcelImport(event){
         if(typeof saifCol === 'number') buckets.push({ gateway: 'Saif Bkash', currency: 'BDT', amount: saifCol });
         if(typeof brac === 'number') buckets.push({ gateway: 'Brac Bank', currency: 'BDT', amount: brac });
         if(typeof bkashMarchent === 'number') buckets.push({ gateway: 'Bkash Merchant', currency: 'BDT', amount: bkashMarchent });
+        if(typeof sajibCol === 'number') buckets.push({ gateway: 'Sajib Bkash', currency: 'BDT', amount: sajibCol });
 
         if(typeof handover === 'number' && handover > 0){
           const hEntry = {
@@ -2270,11 +2347,13 @@ function switchTab(tab){
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.getElementById('tab-reservations').style.display = tab === 'reservations' ? 'block' : 'none';
   document.getElementById('tab-financials').style.display = tab === 'financials' ? 'block' : 'none';
+  document.getElementById('tab-statement').style.display = tab === 'statement' ? 'block' : 'none';
   document.getElementById('tab-statistics').style.display = tab === 'statistics' ? 'block' : 'none';
   document.getElementById('tab-analysis').style.display = tab === 'analysis' ? 'block' : 'none';
   document.getElementById('tab-admin').style.display = tab === 'admin' ? 'block' : 'none';
   if(tab === 'statistics') renderStatistics();
   if(tab === 'analysis') renderAnalysisTab();
+  if(tab === 'statement') renderStatement();
 }
 
 // ---------------- Properties ----------------
@@ -2464,6 +2543,7 @@ function detectGateway(fullText, platform){
 
   // Check the most specific wordings first — "bkash merchant" must not be read as personal bkash.
   if(/merchant/.test(t)) return 'Bkash Merchant';
+  if(/sajib\s*'?s?\s*bkash|bkash\s*(of\s*)?sajib|\bsajib\b/.test(t)) return 'Sajib Bkash';
   if(/(saif|my|amar|personal)\s*'?s?\s*bkash|bkash\s*(of\s*)?(saif|mine)/.test(t)) return 'Saif Bkash';
   if(/\bbrac\b|brac\s*bank/.test(t)) return 'Brac Bank';
   if(/payoneer|payonner/.test(t)) return 'Payoneer';
@@ -3187,25 +3267,27 @@ async function addExpense(){
   const qtyRaw = parseInt(document.getElementById('ex-qty').value, 10);
   const qty = qtyRaw > 0 ? qtyRaw : undefined; // blank = read "12 pcs" from the item text if present
   const notes = document.getElementById('ex-notes').value.trim();
+  const gateway = document.getElementById('ex-gateway').value;
 
   if(!amount || isNaN(parseFloat(amount))){ showToast('Enter a valid amount'); return; }
 
   const entry = {
     id: uid(), property, category, date, currency, amount, month: currentMonth,
-    item: item || category, qty, notes, addedBy: session.name, addedAt: new Date().toISOString()
+    item: item || category, qty, notes, gateway, addedBy: session.name, addedAt: new Date().toISOString()
   };
   expenses.unshift(entry);
   await saveExpenses();
   renderExpenseLog();
   renderRequisitionList();
   renderFinancialReports();
+  renderStatement();
   document.getElementById('ex-amount').value = '';
   document.getElementById('ex-item').value = '';
   document.getElementById('ex-qty').value = '';
   document.getElementById('ex-notes').value = '';
   document.getElementById('ex-date').value = '';
   showToast('Expense logged');
-  logActivity(`logged an expense of ${fmtReceived(amount, currency)} for ${property} (${category})`);
+  logActivity(`logged an expense of ${fmtReceived(amount, currency)} for ${property} (${category})${gateway ? ' paid from ' + gateway : ''}`);
 }
 async function removeExpense(id){
   const idx = expenses.findIndex(e => e.id === id);
@@ -3449,15 +3531,16 @@ async function commitBulkExpenses(){
   if(missing.length){ showToast(`${missing.length} line(s) have no property — pick one in the preview`); return; }
 
   await ensureProperties(rows.map(r => r.property));
+  const bulkGateway = document.getElementById('ex-bulk-gateway').value;
   const entries = rows.map(r => ({
     id: uid(), property: canonicalProperty(r.property), category: r.category || categorizeExpenseItem(r.item),
     date: r.date || '', currency: r.currency || 'BDT', amount: String(r.amount), month: currentMonth,
     item: r.item || r.category, qty: r.qty > 0 ? r.qty : 1,
-    notes: 'Added via bulk paste', addedBy: session.name, addedAt: new Date().toISOString()
+    notes: 'Added via bulk paste', gateway: bulkGateway, addedBy: session.name, addedAt: new Date().toISOString()
   }));
   expenses = [...entries, ...expenses];
   await saveExpenses();
-  renderExpenseLog(); renderRequisitionList(); renderFinancialReports(); updateStats();
+  renderExpenseLog(); renderRequisitionList(); renderFinancialReports(); renderStatement(); updateStats();
   const props = new Set(entries.map(e => e.property));
   const total = entries.reduce((s,e) => s + toBdtNumber(e.amount, e.currency), 0);
   clearBulkExpenses();
@@ -3555,6 +3638,7 @@ function renderExpenseLog(){
       <td>${escapeHtml(e.category || '')}</td>
       <td>${fmtBdtEquivalent(e.amount, e.currency)}</td>
       <td>${escapeHtml(e.property || 'Unspecified')}</td>
+      <td>${e.gateway ? escapeHtml(e.gateway) : '<span style="color:#7a756a;">—</span>'}</td>
       <td style="white-space:nowrap;">${actions}</td>
     </tr>`;
   }).join('');
@@ -3597,6 +3681,11 @@ function openEditExpense(id){
   document.getElementById('eex-amount').value = (entry.amount === null || entry.amount === undefined) ? '' : entry.amount;
   document.getElementById('eex-item').value = entry.item || '';
   document.getElementById('eex-notes').value = entry.notes || '';
+  const egw = document.getElementById('eex-gateway');
+  if(entry.gateway && ![...egw.options].some(o => o.value === entry.gateway)){
+    egw.insertAdjacentHTML('beforeend', `<option>${escapeHtml(entry.gateway)}</option>`);
+  }
+  egw.value = entry.gateway || '';
 
   document.getElementById('editExpenseSub').textContent = `${entry.item || entry.category || 'Expense'} · ${entry.month || currentMonth}`;
   document.getElementById('editExpenseStatus').textContent = '';
@@ -3630,6 +3719,7 @@ async function saveEditExpense(){
   entry.amount = rawAmount === '' ? null : parseFloat(rawAmount);
   entry.item = item || category;
   entry.notes = document.getElementById('eex-notes').value.trim();
+  entry.gateway = document.getElementById('eex-gateway').value;
   entry.editedBy = session.name;
   entry.editedAt = new Date().toISOString();
 
@@ -3637,6 +3727,7 @@ async function saveEditExpense(){
   renderExpenseLog();
   renderRequisitionList();
   renderFinancialReports();
+  renderStatement();
 
   closeEditExpense();
   showToast('Expense updated');
@@ -4010,8 +4101,111 @@ function renderAnalysisSuggestions(){
   `).join('');
 }
 
+// ---------------- Gateway statement (debit / credit / running balance) ----------------
+// Credit = confirmed booking money that landed in the gateway; Debit = expenses paid from it.
+// In "selected month" mode, everything from earlier months is rolled into the opening balance,
+// so the closing balance always matches the all-months running balance.
+function computeStatement(gateway, period){
+  const monthIdx = m => { const i = months.indexOf(m); return i === -1 ? months.length : i; };
+  const txns = [];
+  confirmed.forEach(c => {
+    if(c.gateway !== gateway) return;
+    const amt = toBdtNumber(c.amount, c.currency);
+    if(!amt) return;
+    txns.push({
+      month: c.month, mi: monthIdx(c.month), date: c.checkin || '', kind: 'credit',
+      particulars: `Booking — ${c.guest || 'Guest'}${c.platform ? ' (' + c.platform + ')' : ''}`,
+      property: c.property || '', debit: 0, credit: amt
+    });
+  });
+  expenses.forEach(e => {
+    if(e.gateway !== gateway) return;
+    const amt = toBdtNumber(e.amount, e.currency);
+    if(!amt) return;
+    const qty = e.qty > 1 ? ` × ${e.qty}` : '';
+    txns.push({
+      month: e.month, mi: monthIdx(e.month), date: e.date || '', kind: 'debit',
+      particulars: `Expense — ${e.item || e.category || 'Expense'}${qty}${e.category && e.item && e.item !== e.category ? ' (' + e.category + ')' : ''}`,
+      property: e.property || '', debit: amt, credit: 0
+    });
+  });
+  // Month first, then date (undated entries sit at the end of their month), credits before debits on the same day.
+  txns.sort((a,b) => (a.mi - b.mi) || (a.date || '9999').localeCompare(b.date || '9999') || (a.kind === b.kind ? 0 : a.kind === 'credit' ? -1 : 1));
+
+  let opening = 0, rows = txns;
+  if(period === 'month'){
+    const cur = monthIdx(currentMonth);
+    opening = txns.filter(t => t.mi < cur).reduce((s,t) => s + t.credit - t.debit, 0);
+    rows = txns.filter(t => t.month === currentMonth);
+  }
+  let bal = opening;
+  rows = rows.map(t => { bal += t.credit - t.debit; return { ...t, balance: bal }; });
+  const totalCredit = rows.reduce((s,t) => s + t.credit, 0);
+  const totalDebit = rows.reduce((s,t) => s + t.debit, 0);
+  return { opening, rows, totalCredit, totalDebit, closing: opening + totalCredit - totalDebit };
+}
+
+function renderStatement(){
+  const body = document.getElementById('stmtBody');
+  if(!body) return;
+  const gateway = document.getElementById('stmtGateway').value;
+  const period = document.getElementById('stmtPeriod').value;
+  const st = computeStatement(gateway, period);
+  const fmt = n => (n < 0 ? '-' : '') + Math.round(Math.abs(n)).toLocaleString('en-IN');
+  const balColor = n => n >= 0 ? 'var(--green)' : 'var(--red)';
+  const periodLabel = period === 'month' ? currentMonth : 'All months';
+
+  document.getElementById('stmtKpis').innerHTML = [
+    { label: 'Opening balance', value: fmt(st.opening), sub: period === 'month' ? 'Carried from earlier months' : 'Start of records' },
+    { label: 'Total credit (in)', value: fmt(st.totalCredit), sub: `${st.rows.filter(r => r.credit).length} booking(s)` },
+    { label: 'Total debit (out)', value: fmt(st.totalDebit), sub: `${st.rows.filter(r => r.debit).length} expense(s)` },
+    { label: 'Closing balance', value: fmt(st.closing), sub: `${gateway} · ${periodLabel}`, color: balColor(st.closing) }
+  ].map(k => `<div class="kpi-card"><div class="kpi-label">${k.label}</div><div class="kpi-value"${k.color ? ` style="color:${k.color};"` : ''}>BDT ${k.value}</div><div class="kpi-sub">${escapeHtml(k.sub)}</div></div>`).join('');
+
+  let html = `<tr style="color:#9a958a;"><td>—</td><td><i>Opening balance</i></td><td></td><td></td><td></td><td style="text-align:right;color:${balColor(st.opening)};">${fmt(st.opening)}</td></tr>`;
+  if(!st.rows.length){
+    html += `<tr><td colspan="6" style="color:#7a756a;">No transactions for ${escapeHtml(gateway)} in ${escapeHtml(periodLabel)}.</td></tr>`;
+  } else {
+    html += st.rows.map(r => `<tr>
+      <td style="white-space:nowrap;">${r.date ? fmtDate(r.date) : '—'}${period === 'all' ? `<div style="font-size:10.5px;color:#7a756a;">${escapeHtml(r.month || '')}</div>` : ''}</td>
+      <td>${escapeHtml(r.particulars)}</td>
+      <td>${escapeHtml(r.property)}</td>
+      <td style="text-align:right;color:${r.debit ? 'var(--red)' : '#7a756a'};">${r.debit ? fmt(r.debit) : '—'}</td>
+      <td style="text-align:right;color:${r.credit ? 'var(--green)' : '#7a756a'};">${r.credit ? fmt(r.credit) : '—'}</td>
+      <td style="text-align:right;font-weight:600;color:${balColor(r.balance)};">${fmt(r.balance)}</td>
+    </tr>`).join('');
+  }
+  html += `<tr style="font-weight:600;"><td></td><td>Total / Closing balance</td><td></td>
+    <td style="text-align:right;">${fmt(st.totalDebit)}</td><td style="text-align:right;">${fmt(st.totalCredit)}</td>
+    <td style="text-align:right;color:${balColor(st.closing)};">${fmt(st.closing)}</td></tr>`;
+  body.innerHTML = html;
+
+  const scope = period === 'month' ? expenses.filter(e => e.month === currentMonth) : expenses;
+  const unassigned = scope.filter(e => !e.gateway);
+  document.getElementById('stmtUnassigned').textContent = unassigned.length
+    ? `${unassigned.length} expense(s) in ${periodLabel} (BDT ${fmt(unassigned.reduce((s,e) => s + toBdtNumber(e.amount, e.currency), 0))}) have no "Paid from" gateway yet, so they aren't in any statement. Set it via Edit in the Financials expense log.`
+    : '';
+}
+
+function exportStatementCsv(){
+  const gateway = document.getElementById('stmtGateway').value;
+  const period = document.getElementById('stmtPeriod').value;
+  const st = computeStatement(gateway, period);
+  const q = v => `"${String(v).replace(/"/g, '""')}"`;
+  const lines = [['Month','Date','Particulars','Property','Debit (BDT)','Credit (BDT)','Balance (BDT)'].map(q).join(',')];
+  lines.push(['', '', 'Opening balance', '', '', '', Math.round(st.opening)].map(q).join(','));
+  st.rows.forEach(r => lines.push([r.month || '', r.date || '', r.particulars, r.property, r.debit ? Math.round(r.debit) : '', r.credit ? Math.round(r.credit) : '', Math.round(r.balance)].map(q).join(',')));
+  lines.push(['', '', 'Total / Closing balance', '', Math.round(st.totalDebit), Math.round(st.totalCredit), Math.round(st.closing)].map(q).join(','));
+  const blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `Statement_${gateway.replace(/\s+/g,'_')}_${period === 'month' ? String(currentMonth).replace(/[^a-zA-Z0-9]/g,'') : 'All'}_${todayStr()}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
 // ---------------- Financial reports ----------------
-const FIXED_GATEWAYS = ['Cash', 'Saif Bkash', 'Bkash Merchant', 'Brac Bank', 'Payoneer'];
+const FIXED_GATEWAYS = ['Cash', 'Saif Bkash', 'Sajib Bkash', 'Bkash Merchant', 'Brac Bank', 'Payoneer'];
 function computeHandoverSummary(monthKey){
   const mk = monthKey || currentMonth;
   const totals = {};
@@ -4079,6 +4273,7 @@ function computeExpenseBreakdown(monthKey){
   return rows;
 }
 function renderFinancialReports(){
+  renderStatement();
   renderGatewayReport();
   renderPropertyReport();
   renderExpenseBreakdown();
@@ -4165,6 +4360,7 @@ function expenseRowsForExport(){
     Category: e.category || '',
     'Amount': fmtReceived(e.amount, e.currency),
     'BDT Equivalent': Math.round(toBdtNumber(e.amount, e.currency)),
+    'Paid From': e.gateway || '',
     Notes: e.notes || '',
     'Added By': e.addedBy || ''
   }));
